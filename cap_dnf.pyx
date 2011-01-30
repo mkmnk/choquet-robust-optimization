@@ -93,9 +93,11 @@ def cap_dnf(np.ndarray[np.float64_t, ndim=1] cap, int S,np.ndarray[np.int_t, ndi
 
 #    cdef t0 = time()
     S_el = [p for p in range(np.binary_repr(S).__len__()) if S & (1 << p)]
-    for el1,el2 in permutations(S_el[:2]):
+    for el in S_el:
         A = np.array(cmatr)
-        A[el1,el2] = 1
+        for i in S_el:
+          if i != el:
+            A[el,i] = 1
         A = WFL(A)
         capnew = np.array(cap)
 ### Rewrite later for performance 

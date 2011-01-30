@@ -20,10 +20,10 @@ set_printoptions(edgeitems='Inf',linewidth=90)
 cvx.printing.options['width'] = -1
 cvx.solvers.options['LPX_K_MSGLEV'] = 0
 #### Parameters
-Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1),(0b01000,0.2)]
+#Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1),(0b01000,0.2)]
 #Shapley = [(0b00001,0.3),(0b00010,0.3),(0b00100,0.1)]
 #Shapley = [(0b00001,0.5),(0b00010,0.3),(0b00100,0.1)]
-#Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1)]
+Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1)]
 #Shapley = [(0b00001,0.7),(0b00010,0.1)]
 #Shapley = [(0b00001,0.2),(0b00010,0.3)]
 #Shapley = [(0b00100,0.8)]
@@ -113,6 +113,7 @@ def xr_scan(xr, A, b, Aeq, beq):
         cap = xr_discr(xr, x, A, b, Aeq, beq)
         mcap = chq.Mobius(cap)
         if nonzero(mcap<0)[0].any():
+            print chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])
             upbound = [[chq.max_choquet(p),p] for p in chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])]
             [q.extend([chq.Choquet(array(q[0]),q[1]) -x ,x]) for q in upbound]
             Ub.extend(upbound)
@@ -122,11 +123,15 @@ def xr_scan(xr, A, b, Aeq, beq):
             Ub.append(upbound)     
     return Ub,xr_min,xr_max
 
-def caps_mm(xub_arr,xr,A,b,Aeq,beq):
+def caps_mm(xub_arr,xr,A,b,Aeq,beq,R):
     print "IN CAPS_MM"
     t0 = time()
     print len(xub_arr)
-    c = array([ravel(cvx.solvers.lp(-chq.MobiusB(p)+chq.MobiusB(xr), A, b, Aeq, beq,'glpk')['x']) for p in xub_arr]).round(9)
+    Sols = [cvx.solvers.lp(-chq.MobiusB(p)+chq.MobiusB(xr), A, b, Aeq, beq,'glpk') for p in xub_arr]   
+    c = array([ravel(p['x']) for p in Sols if p['primal objective'] < -R]).round(9)
+    if len(c) == 0:
+        print "NO CAPSMM"
+        return c
     print "LPS", time()-t0
     c = unique(c.view([('',c.dtype)]*c.shape[1])).view(c.dtype).reshape(-1,c.shape[1])
     print "CAPS_MM", time()-t0
@@ -158,7 +163,7 @@ def main():
     #    print caps_mm(xub_arr,xr,A,b,Aeq,beq)
         "UMM EXTEND"
         umm_bef = len(Umm)
-        Umm.extend([[chq.max_choquet(p),p] for p in caps_mm(xub_arr,xr,A,b,Aeq,beq) if tuple(p) not in [tuple(q[1]) for q in Umm]])
+        Umm.extend([[chq.max_choquet(p),p] for p in caps_mm(xub_arr,xr,A,b,Aeq,beq,R) if tuple(p) not in [tuple(q[1]) for q in Umm]])
         if len(Umm) == umm_bef:
             print "STOP NO_ADD"
             print "solution", xr
