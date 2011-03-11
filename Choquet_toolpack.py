@@ -17,7 +17,7 @@ from scipy.optimize import fmin_slsqp
 from time import time
 #cvx.solvers.options['LPX_K_MSGLEV'] = 0
 ### Constants
-dim = 6
+dim = 5
 Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
 #######
 
@@ -81,8 +81,9 @@ def max_choquet_00(capacity):
     r = x_opt.maximize('ralg')
     return r.xf
 """
+#Budg = 1
 
-def max_choquet(capacity):
+def max_choquet(capacity,Budg = 1.5):
 #    x0 = [0,0.2,0.3,0.5]
     x0 = zeros(dim+1)
 #    x0 = [0,1./3,1./3,1./3]
@@ -91,7 +92,7 @@ def max_choquet(capacity):
 #    x0 = [1,0.2,0.2,0.2,0.2,0.2]
     def f_eqcons(x):
         Aeq = ones(len(x)-1)
-        beq = 1
+        beq = Budg
         return array([dot(Aeq,x[1:])-beq])
 
     def fprime_eqcons(x):
@@ -99,7 +100,7 @@ def max_choquet(capacity):
 
     def f_ineqcons(x,capacity):
         A = append(Choquet(x[1:],capacity)-x[0], x)
-        A = append(A,1-x)
+        A = append(A,Budg-x)
         return A
         
 
@@ -120,7 +121,7 @@ def max_choquet(capacity):
     fprime_ineqcons_w = lambda x: fprime_ineqcons(x,capacity)
 #    t0 = time()
 #    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,iprint=2,full_output=1,epsilon=4e-08)
-    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1)
+    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-09)
 #    a = time()-t0
 #    print a, sol[1]
 #    print sol
@@ -128,13 +129,13 @@ def max_choquet(capacity):
 #        print capacity
     return sol[0][1:]
     
-def solve_mmax(Umm):
+def solve_mmax(Umm,Budg = 1.5):
     x0 = zeros(dim+1)
 #    x0 = [0,0.1,0.2,0.3,0.4]
     
     def f_eqcons(x):
         Aeq = ones(len(x)-1)
-        beq = 1
+        beq = Budg
         return array([dot(Aeq,x[1:])-beq])
     
     def fprime_eqcons(x):

@@ -2,6 +2,7 @@ cimport cython
 import numpy as np
 cimport numpy as np
 from itertools import permutations
+from random import shuffle
 #from time import time
 cdef extern from "math.h":
   double pow(double,double)
@@ -93,6 +94,8 @@ def cap_dnf(np.ndarray[np.float64_t, ndim=1] cap, int S,np.ndarray[np.int_t, ndi
 
 #    cdef t0 = time()
     S_el = [p for p in range(np.binary_repr(S).__len__()) if S & (1 << p)]
+#    shuffle(S_el)
+#    print S_el
     for el in S_el:
         A = np.array(cmatr)
         for i in S_el:
@@ -105,9 +108,7 @@ def cap_dnf(np.ndarray[np.float64_t, ndim=1] cap, int S,np.ndarray[np.int_t, ndi
             el_i = [p for p in range(np.binary_repr(i).__len__()) if i & (1 << p)]
             new_el = el_i[:]
             for j in el_i: 
-#inf_set = np.intersect1d(el_i,np.nonzero(A[j,:])[0])
                 inf_set = set(el_i).intersection(set(np.nonzero(A[j,:])[0]))
-#new_el = np.setdiff1d(new_el,inf_set)
                 new_el = set(new_el).difference(set(inf_set))
             newin = sum([pow(2,p) for p in new_el])
             if newin != i:
@@ -115,7 +116,6 @@ def cap_dnf(np.ndarray[np.float64_t, ndim=1] cap, int S,np.ndarray[np.int_t, ndi
                 if (capnew[newin] > -0.000001) and (capnew[newin] < 0.000001):
                     capnew[newin]=0.0
                 capnew[i] = 0.0
-#        print "DNF 1 CYCLE", t0-time()            
         if np.nonzero(capnew < -0.000001)[0].any():
             capnew = cap_dnf(capnew, np.nonzero(capnew < 0)[0][0], A,result)
         else: 

@@ -29,7 +29,9 @@ Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1)]
 #Shapley = [(0b00100,0.8)]
 #Shapley = [(0b00010,0.3)]
 #Shapley = [(0b00001,0.2)]
+#Shapley = []
 maxiter = 10
+GRID=10
 #####
 #
 ######MAIN
@@ -68,7 +70,7 @@ def shapley(m,el):
         if i & el != el:
             coeff = float(factorial(chq.bitCount(m-1) - chq.bitCount(i) - 1))*factorial(chq.bitCount(i))/factorial(chq.bitCount(m-1))
             x.extend([coeff,-coeff])
-            I.extend([0,0])   # somehow it wouldn't take I=zeros(m)
+            I.extend([0,0])   # for some reason it wouldn't take I=zeros(m)
             J.extend([i | el, i])
     A = cvx.spmatrix(x,I,J)
     return A  
@@ -107,13 +109,20 @@ def xr_scan(xr, A, b, Aeq, beq):
     if xr_min == xr_max:
         xr_range = [xr_min]
     else:
-        xr_range = arange(xr_min,xr_max,(xr_max-xr_min)/15)
+        xr_range = arange(xr_min,xr_max,(xr_max-xr_min)/GRID)
     Ub = []
     for x in xr_range:
         cap = xr_discr(xr, x, A, b, Aeq, beq)
         mcap = chq.Mobius(cap)
         if nonzero(mcap<0)[0].any():
-            print chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])
+            """ Overcutting
+            c = array([chq.max_choquet(p) for p in chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])]).round(2)
+            print "before\n",c
+            c = unique(c.view([('',c.dtype)]*c.shape[1])).view(c.dtype).reshape(-1,c.shape[1])
+            print "after\n",c
+            print mcap
+            raw_input("Press Enter to continue...")
+            """
             upbound = [[chq.max_choquet(p),p] for p in chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])]
             [q.extend([chq.Choquet(array(q[0]),q[1]) -x ,x]) for q in upbound]
             Ub.extend(upbound)
@@ -143,8 +152,8 @@ def main():
     Aeq,beq = gen_equalities(chq.dim,Shapley)
 #    xr = array([1./3,1./3,1./3])
 #    xr = array([0.25,0.25,0.25,0.25])
-#    xr = array([0.2,0.2,0.2,0.2,0.2])
-    xr = array([1./6,1./6,1./6,1./6,1./6,1./6])
+    xr = array([0.2,0.2,0.2,0.2,0.2])
+#    xr = array([1./6,1./6,1./6,1./6,1./6,1./6])
     R = 0
     Umm = []
     for i in range(maxiter):
@@ -182,6 +191,7 @@ def main():
     gap = max([p[2] for p in Ub]) - R
     print "Final and GAP", i, xr,R,gap,gap/R*100
     print t0-time() 
+    return array(xr)
 #    x = arange(0,1.0,0.01)
 #    z = [[(-cvx.solvers.lp(chq.MobiusB(xr)-chq.MobiusB([p,q,1-p-q]),A,b,Aeq,beq,'glpk')['primal objective'],[p,q,1-p-q]) for q in x if p+q <= 1] for p in x]
 #    print "LALALALA", max([p for p in chain(*z)])
@@ -205,8 +215,11 @@ def checker():
             print z
 
 
+
+
 #import matplotlib.pyplot as plt
-main()
+xr = main()
+
 #checker()
 
 
