@@ -13,6 +13,8 @@ cdef extern from "math.h":
 
 Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
 dFx = [lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x)]
+#Fx = [lambda x: -0.029335929406647*pow(x,6) + 0.207346406139707*pow(x,5) - 0.579333438490725*pow(x,4) + 0.821527980327791*pow(x,3) - 0.698397454788673*pow(x,2)  + 0.687228652793793*x, lambda x: -0.027728205126421*pow(x,6) + 0.197460701672059*pow(x,5) - 0.567139344258168*pow(x,4) + 0.888084577320966*pow(x,3) - 1.002827533837975*pow(x,2)  + 1.152014732068982*x,lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
+#dFx = [lambda x: -0.029335929406647*6*pow(x,5) + 0.207346406139707*5*pow(x,4) - 0.579333438490725*4*pow(x,3) + 0.821527980327791*3*pow(x,2) - 0.698397454788673*2*x  + 0.687228652793793, lambda x: -0.027728205126421*6*pow(x,5) + 0.197460701672059*5*pow(x,4) - 0.567139344258168*4*pow(x,3) + 0.888084577320966*3*pow(x,2) - 1.002827533837975*2*x  + 1.152014732068982, lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x)]
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -58,7 +60,7 @@ def MobiusB(x):
             if v & j == v:
                 f_set = [p for p in range(xlen) if j & (1 << p)]   # moves a bit along and checks if it is present in the integer
                 f[v] += pow(-1,bitCount(j - v))*min([Fx[p](x[p]) for p in f_set])
-                if (f[v] < 0.000001) and (f[v] > -0.000001):
+                if (f[v] < 0.00000001) and (f[v] > -0.00000001):
                     f[v] = 0.0
     return cvx.matrix(f)  #CVX
 
@@ -97,3 +99,13 @@ def Ch_gradient(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim
     grad_sort = [p[i]*dfx[i] for i in range(len(dfx))]
     grad = [grad_sort[i] for i in argsort(perm)]
     return grad
+
+def Choquet_perm(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+    cdef int i = 0
+    #fx = [Fx[i](x[i]) for i in range(len(x))]
+    perm = [int(pow(2,i)) for i in np.argsort(x)]
+    p = []
+    for i in range(len(perm)): 
+        p.extend([capacity[sum(perm[i:])]-capacity[sum(perm[i+1:])]])
+    perm_vector = [p[i] for i in argsort(perm)]
+    return perm_vector
