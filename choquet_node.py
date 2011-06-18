@@ -181,7 +181,7 @@ f_sorted = [5,6,7,8,9,11,12,13,14,15,16,18,19,20,24,25,26,27,28,29,31,32,33]
 #chevalues.reverse()
 #print chevalues
 
-#chq.max_tree(G,1,f_sorted,8)
+print chq.max_tree(G,1,f_sorted,8)
 #print chq.max_choquet_sbgr(G,1,f_sorted)
 #print chq.max_choquet(G.node[11]['cap'],0.35)
 #print G.edges()
@@ -197,21 +197,4 @@ f23 = [-0.033594756463189,   0.237604817402191,  -0.665360513230697,   0.9520072
 #f22 = [-0.029335929406647,   0.207346406139707,  -0.579333438490725,   0.821527980327791, -0.698397454788673,   0.687228652793793, 0]
 f30 = [-0.027728205126421,   0.197460701672059,  -0.567139344258168,   0.888084577320966, -1.002827533837975,   1.152014732068982, 0]
 
-
-
-
-
-
-#class ch_node:
-#    def __init__(self,id,name, subnodes = [], shapley = {}, int_index = {}, nec_suff = {}, func = [], cap = []):
-#        self.id = id
-#        self.name = name
-#        self.subnodes = subnodes
-#        self.shapley = shapley
-#        self.int_index = int_index
-#        self.nec_suff = nec_suff
-#        self.func = func
-#        self.cap = cap
-#    
-#    def gen_inc_matrix(self):
         

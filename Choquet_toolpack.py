@@ -9,7 +9,7 @@ from itertools import *
 from collections import defaultdict
 import networkx as nx
 from cap_dnf import cap_dnf
-#from math import power
+from math import factorial
 #import math as math
 import random as rnd
 import cvxopt as cvx
@@ -19,8 +19,8 @@ from scipy.optimize import fmin_slsqp
 from time import time
 #cvx.solvers.options['LPX_K_MSGLEV'] = 0
 ### Constants
-dim = 3
-Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
+dim = 6
+Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-x)]
 #Fx = [lambda x: -0.029335929406647*pow(x,6) + 0.207346406139707*pow(x,5) - 0.579333438490725*pow(x,4) + 0.821527980327791*pow(x,3) - 0.698397454788673*pow(x,2)  + 0.687228652793793*x, lambda x: -0.027728205126421*pow(x,6) + 0.197460701672059*pow(x,5) - 0.567139344258168*pow(x,4) + 0.888084577320966*pow(x,3) - 1.002827533837975*pow(x,2)  + 1.152014732068982*x,lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
 #dFx = [lambda x: -0.029335929406647*6*pow(x,5) + 0.207346406139707*5*pow(x,4) - 0.579333438490725*4*pow(x,3) + 0.821527980327791*3*pow(x,2) - 0.698397454788673*2*x  + 0.687228652793793, lambda x: -0.027728205126421*6*pow(x,5) + 0.197460701672059*5*pow(x,4) - 0.567139344258168*4*pow(x,3) + 0.888084577320966*3*pow(x,2) - 1.002827533837975*2*x  + 1.152014732068982, lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x)]
 #######
@@ -42,6 +42,19 @@ Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambd
 #                    f[v] = 0.0
 #    return cvx.matrix(f)  #CVX
 ##    return array(f)  # Pure Mosek
+
+def Shapley_vals(cap):
+    m = len(cap)
+    for el in range(int(log2(m))):
+        el=pow(2,el)
+        mul = zeros(m)
+        for i in range(m):        
+            if i & el != el:
+                coeff = float(factorial(bitCount(m-1) - bitCount(i) - 1))*factorial(bitCount(i))/factorial(bitCount(m-1))
+                mul[i | el] = coeff
+                mul[i] = -coeff
+        print log2(el)+1, dot(mul,cap)
+    return 0  
 
 def MobiusC(x):
     """ 
@@ -87,7 +100,7 @@ def max_choquet_00(capacity):
 """
 #Budg = 1
 
-def max_choquet(capacity,Budg = 1.5):
+def max_choquet(capacity,Budg = 1):
 #    x0 = [0,0.2,0.3,0.5]
     x0 = zeros(dim+1)
 #    x0 = [0,1./3,1./3,1./3]
@@ -133,7 +146,7 @@ def max_choquet(capacity,Budg = 1.5):
 #        print capacity
     return sol[0][1:]
     
-def solve_mmax(Umm,Budg = 1.5):
+def solve_mmax(Umm,Budg = 1):
     x0 = zeros(dim+1)
 #    x0 = [0,0.1,0.2,0.3,0.4]
     
@@ -174,6 +187,9 @@ def solve_mmax(Umm,Budg = 1.5):
 ########## Tree
 
 def node_val(G,n,f_vals):
+    """
+    G - graph, n - the root node
+    """
     G_pred = G.node[n]['psorted']
     if not G_pred:
         f_weights = defaultdict(lambda: 0)
@@ -192,6 +208,9 @@ def node_val(G,n,f_vals):
 
 
 def max_tree(G,n,fsorted,Budg = 1, x0 = array([])):
+    """
+    G - graph, n - the root node
+    """
     if not x0.shape[0]:
         x0 = zeros(len(fsorted)+1)
 
@@ -206,8 +225,8 @@ def max_tree(G,n,fsorted,Budg = 1, x0 = array([])):
     def f_ineqcons(x,G,n,fsorted):
         n_value = node_val(G,n,dict(zip(fsorted,x[1:])))[0]
         A = append(n_value-x[0], x)
-#        A = append(A,Budg-x)
-        A = append(A,1-x)
+        A = append(A,Budg-x)
+#        A = append(A,1-x)
         return A
         
 

@@ -67,17 +67,17 @@ GRID=10
 #
 #
 ## NODE 17
-Shapley = {'Sh_values': [(0b100,0.45)], 
-           'Sh_order': [], 
-           'Sh_equal': [],
-           'Sh_delta': 0.05}
-
-Int_index = {'ii_values': [], 
-           'ii_order': [],
-           'ii_positive': [], 
-           'ii_equal': [],
-           'ii_delta': 0.05}
-Necessity = [0b100, 0b010] 
+#Shapley = {'Sh_values': [(0b100,0.45)], 
+#           'Sh_order': [], 
+#           'Sh_equal': [],
+#           'Sh_delta': 0.05}
+#
+#Int_index = {'ii_values': [], 
+#           'ii_order': [],
+#           'ii_positive': [], 
+#           'ii_equal': [],
+#           'ii_delta': 0.05}
+#Necessity = [0b100, 0b010] 
 # NODE 21, 22
 #Shapley = {'Sh_values': [], 
 #           'Sh_order': [(0b10,0b01)], 
@@ -119,7 +119,8 @@ Necessity = [0b100, 0b010]
 #           'ii_order': [],
 #           'ii_positive': [], 
 #           'ii_equal': [],
-#           'ii_delta': 0.05}#Shapley = {'Sh_values': [(0b00001,0.4)], 
+#           'ii_delta': 0.05}
+#Shapley = {'Sh_values': [(0b00001,0.4)], 
 #           'Sh_order': [(0b00001,0b00010),(0b00010,0b10000),(0b10000,0b00100)], 
 #           'Sh_equal': [(0b00100,0b01000)],
 #           'Sh_delta': 0.05}
@@ -160,6 +161,20 @@ Necessity = [0b100, 0b010]
 #           'ii_delta': 0.05}
 #Necessity = [0b01]
 
+# rcap test
+Shapley = {'Sh_values': [(0b001,0.2)], 
+           'Sh_order': [], 
+           'Sh_equal': [],
+           'Sh_delta': 0.05}
+
+Int_index = {'ii_values': [], 
+           'ii_order': [],
+           'ii_positive': [], 
+           'ii_equal': [],
+           'ii_delta': 0.05}
+Necessity = [] 
+
+
 #####
 #
 ######MAIN
@@ -191,6 +206,7 @@ def xr_scan(xr, A, b, Aeq, beq):
     for x in xr_range:
         cap = xr_discr(xr, x, A, b, Aeq, beq)
         mcap = chq.Mobius(cap)
+#        mcap = array([ 0. ,  0.6,  0.6,  0.6, -0.3, -0.3, -0.3,  0.1])
         if nonzero(mcap<0)[0].any():
             """ Overcutting
             c = array([chq.max_choquet(p) for p in chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])]).round(2)
@@ -227,6 +243,8 @@ def main():
     t0 = time()
     A,b = gen_inequalities(chq.dim,Shapley,Int_index)
     Aeq,beq = gen_equalities(chq.dim,Shapley['Sh_values'],Int_index,Necessity)
+#    print A, Aeq
+#    raw_input("123")
     xr = [1./chq.dim for i in range(chq.dim)]
     R = 0
     Umm = []
@@ -264,7 +282,7 @@ def main():
 #    print [p[1] for p in Ub if p[2]>R]
     gap = max([p[2] for p in Ub]) - R
     print "Final and GAP", i, xr,R,gap,gap/R*100
-    print t0-time() 
+    print "Time", time()-t0 
     return array(xr)
 #    x = arange(0,1.0,0.01)
 #    z = [[(-cvx.solvers.lp(chq.MobiusB(xr)-chq.MobiusB([p,q,1-p-q]),A,b,Aeq,beq,'glpk')['primal objective'],[p,q,1-p-q]) for q in x if p+q <= 1] for p in x]
