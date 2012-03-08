@@ -5,7 +5,7 @@ from numpy import *
 from scipy import *
 from scipy import sparse
 from itertools import *
-from openopt import LP,NLP
+from openopt import LP,NSP
 from math import *
 import random as rnd
 from polyhedron import Vrep, Hrep
@@ -23,34 +23,7 @@ cvx.solvers.options['LPX_K_MSGLEV'] = 0
 n = 2**chq.dim
 v = zeros(n)
 
-Shapley = {'Sh_values': [(0b001,0.2),(0b010,0.3),(0b100,0.1)], 
-           'Sh_order': [],#[(0b001,0b010),(0b010,0b100)],#(0b1000,0b0100)], 
-           'Sh_equal': [],#[(0b0010,0b0001)],
-           'Sh_delta': 0.05}
-
-Int_index = {'ii_values': [], 
-           'ii_order': [],
-           'ii_positive': [],#[(0b0001,0b0010),(0b0001,0b0100),(0b0001,0b1000),(0b0010,0b0100),(0b0010,0b1000),(0b1000,0b0100)],  
-           'ii_negative': [],
-           'ii_equal': [],
-           'ii_delta': 0.00}
-Necessity = [] 
-
-A,b = gen_inequalities(chq.dim,Shapley,Int_index,convex=0)
-Aeq,beq = gen_equalities(chq.dim,Shapley['Sh_values'],Int_index,Necessity, k_additive=2)
-A = matrix(cvx.matrix([A,Aeq,-Aeq]))
-b = matrix(cvx.matrix([b,beq,-beq]))
-print hstack([b, -A])
-print shape(A)
-# raw_input()
-# print "to hrep"
-# a = time()
-# p = Hrep(A, b)
-# print "to vrep"
-# Vm = array(p.generators)
-# print Vm
-# print a - time()
-# print shape(Vm)
+#from node_config import *
 # Vx = [(chq.max_choquet(p),p) for p in Vm]
 # print Vx
 # print "MMAX"
@@ -58,23 +31,28 @@ print shape(A)
 # print xr
 # #print Vx
 # print array([chq.Choquet(array(xr[0]),v) - chq.Choquet(array(chq.max_choquet(v,1)),v) for v in Vm])
-
 # cap_r = array([0.000000,0.383333,0.333333,0.716667,0.283333,0.666667,0.616667,1])
 # x_cap_r = chq.max_choquet(cap_r)
 # print "Entropy cap diff"
 # print array([chq.Choquet(array(chq.max_choquet(v,1)),v) - chq.Choquet(array(x_cap_r),v) for v in Vm])
 
 
-def find_cap(cap_array):
+def find_cap(cap_array,gm):
+    """
+    Input: array of tuples (capacity (e.g. vertices of U) or its nec.measure component, global maximum)
+    Finds the robust capacity, i.e. the solution of dual problem
+    Capacities assumed to be 2-MONOTONE
+    Output: v^r
+    """
     Budg = 1  
     x0 = array([1./shape(cap_array)[0] for i in range(shape(cap_array)[0])])
-#    x0 = array([1., 0, 0, 0, 0, 0, 0 ])
-    print x0
+#    print x0
     Aeq = ones(shape(cap_array)[0])
     beq = 1
     A = diag(-ones(shape(cap_array)[0]))
     b = zeros(shape(cap_array)[0])
-    vmax = array([chq.Choquet(array(chq.max_choquet(v,Budg)),v) for v in cap_array])
+    vmax=gm
+    # vmax = array([chq.Choquet(array(chq.max_choquet(v,Budg)),v) for v in cap_array])
     
     def fprime(x,cap_array,Budg):
         cap_int = dot(cap_array.T,x)
@@ -94,11 +72,11 @@ def find_cap(cap_array):
     objfunc_w = lambda x: objfunc(x,cap_array,Budg)
     fprime_w = lambda x: fprime(x,cap_array,Budg)
     
-    p = NLP(objfunc_w, x0, df=fprime_w,  A=A,  b=b,  Aeq=Aeq,  beq=beq, iprint = 25, maxIter = 10000, maxFunEvals = 1e7, diffint=1e-15, xtol=1e-11,ftol=1e-11,gtol=1e-11)
+    p = NSP(objfunc_w, x0, df=fprime_w,  A=A,  b=b,  Aeq=Aeq,  beq=beq, iprint = 25, maxIter = 300, maxFunEvals = 1e7, diffint=1e-10, xtol=1e-9,ftol=1e-9,gtol=1e-5)
     r = p.solve('algencan')
-    print r.xf
+    print r.xf, r.ff
     cap_mix = dot(cap_array.T, array(r.xf))
-    return cap_mix
+    return r.ff,r.xf
 
 # cap_mix = find_cap(Vm)
 # x_cap_mix = chq.max_choquet(cap_mix)
@@ -107,24 +85,6 @@ def find_cap(cap_array):
 # print "ROBUST CAP"
 # print cap_mix
 
-#print "Time", time() - t0
-
-# feasibilty test
-# xr = [1./chq.dim for i in range(chq.dim)]
-# xr_max = -cvx.solvers.lp(-chq.MobiusB(xr),A,b,Aeq,beq,'glpk')['primal objective']
-# xr_min = cvx.solvers.lp(chq.MobiusB(xr),A,b,Aeq,beq,'glpk')['primal objective']
-# print xr_max,xr_min
-
-
-
-
-# for v in Vm:                 
-#     d = dot(Ac,v)            
-#     print d                  
-#     if shape(nonzero(d<-0.00000001)[0])[1]:
-#         print "NONCONVEX"    
-#         # mcap = chq.Mobius(v)
-#         # print chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result =[])
 
 def zeta(cap):
     """
@@ -140,6 +100,9 @@ def zeta(cap):
     return nu
 
 def zeta_matrix(n):
+    """
+    Outputs a matrix which multiplied by a matrix of Mobius coeffs gives a matrix of capacities
+    """
     Z = zeros([n,n])
     for i in range(n):
         for j in range(i+1):
@@ -148,6 +111,9 @@ def zeta_matrix(n):
     return Z
 
 def ncmmax(Vm):
+    """
+    Nonconvex minimax - for a matrix of capacities finds all nonconvex rows, and for all permutations generates necessity measures for them. Then solves mmax for the resulting matrix
+    """
     sols = []
     n = int(log2(shape(Vm)[1]))
     Ac = convexity(int(pow(2,n)))
@@ -155,31 +121,38 @@ def ncmmax(Vm):
     base = [int(pow(2,i)) for i in range(n)]
     Vm_conv = []
     Vm_nonconv = []
-    for i in range(shape(Vm)[0]):
+    for i in range(shape(Vm)[0]):                                          # test for 2-monotonicity, separate into 2 arrays
         if shape(nonzero(dot(Ac,Vm[i,:])<-0.00000001)[0])[1]:
             Vm_nonconv.append(Vm[i,:])
         else:
             Vm_conv.append(Vm[i,:])
-    Uc_conv = [[chq.max_choquet(p),p] for p in Vm_conv]
+    Vm_conv=array(Vm_conv)
+    Vm_nonconv=array(Vm_nonconv)
+    Uc_conv = [[chq.Choquet(array(chq.max_choquet(p)),p),p] for p in Vm_conv]
+    Uc_nonconv = [[chq.Choquet(array(chq.max_choquet_glob(p)),p),p] for p in Vm_nonconv]
     Z = zeta_matrix(int(pow(2,n)))
     for perm in permutations(base):
         print perm
-        Vc = zeros(shape(Vm_nonconv))
-        for j in range(n):
-            if(j == 0):
-                elprev = 0
-            else:
-                elprev = reduce(operator.or_,perm[0:j])
-                el = elprev | perm[j]
-                Vc[:,el] = Vm[:,el] - Vm[:,elprev]
-        Vc = dot(Vc,Z)
-        Uc_nonconv = [[chq.max_choquet(p),p] for p in Vc]
-        Uc_nonconv.extend(Uc_conv)
-        sols.append(chq.solve_mmax(Uc_nonconv))        
+        Uc_necmeas = [[p[0],nec_measure(p[1],perm,Z)] for p in Uc_nonconv]
+        Uc_necmeas.extend(Uc_conv)
+        Gmax = array([i[0] for i in Uc_necmeas])
+        Vconv = array([i[1] for i in Uc_necmeas])
+        rcap,rmix = fggind_cap(Vconv,Gmax)
+        sol = list(chq.solve_mmax_wval(Uc_necmeas))
+        sol.extend([chq.max_choquet(rcap),rcap, perm])
+        sols.append(sol)
     return sols
-#sols = ncmmax(Vm)
 
 def convert2kadd(A,b,k=2):
+    """
+    For a k-additive capacity v, all v(A) for |A|>k can be expressed through v(B), B in A, |B|<=k
+    In other words certain coordinates of v are linearly dependent
+    We transform A so that A*v<b becomes Ai * v(<=k) < b
+    This reduces the dimension of A (and accordingly v) significantly and eases extr. point search
+    for 2-add capacities (this implementation) v(A) = sum(v(i,j)) - (|A|-2)sum(v(i)) i,j \in A
+    All columns to be multiplied by v(A), |A|<=2 are updated according to the equality above
+    bas is array of linearly independent column indexes
+    """
     n = shape(A)[1]
     bas = []
     for i in range(1,n):
@@ -204,8 +177,14 @@ def convert2kadd(A,b,k=2):
     b = b[unique(ravel(nonzero(A)[0]))]
     A = A[unique(ravel(nonzero(A)[0])),:]
     return A,b,bas
+                
 
 def convertnadd(Vm, bas,k=2):
+    """
+    Extend A to include factors (i.e. columns) for linearly dependent coordinates of v.
+    Inverse to convert2kadd
+    This implelentation only supports k=2
+    """
     n = 2**chq.dim # fix later to derive as solution of n(n+1) = 2*len(Vm)
     Vm_new = zeros([shape(Vm)[0],n])
     Vm_new[:,bas] = Vm
@@ -221,54 +200,175 @@ def convertnadd(Vm, bas,k=2):
                         Vm_new[:,i] = Vm_new[:,i] - (card_i - 2)*Vm_new[:,j]
     return Vm_new
 
-A, b, bas = convert2kadd(A,b)
-bas.insert(0,0)
-A_red = hstack([b, -A])
-print A_red
-print shape(A_red)
+def nec_measure(capacity,perm,Z):
+    """
+    Generate necessity measure (or beta-measure) for a given permutation
+    calculates Mobius and then does zeta
+    """
+    necmeas = zeros(len(capacity))
+    for j in range(len(perm)):
+        if(j == 0):
+            elprev = 0
+        else:
+            elprev = reduce(operator.or_,perm[0:j])
+        el = elprev | perm[j]
+        necmeas[el] = capacity[el] - capacity[elprev]
+    return dot(necmeas,Z)
 
-# p = Hrep(A, b)
-# print "to vrep"
-# Vm = array(p.generators)
-# print Vm
-# print shape(Vm)
+
+def solve_dual(A,b,Aeq,beq,f,Z):
+    """
+    dual solving for nonconvex capacities
+    actually a wrapper around find_cap (calls it for each permutation)
+    """
+    # Convert A,b,Aeq,beq to Ax<=b form, reduce to 2add and calculate vertices
+    #
+    A = matrix(cvx.matrix([A,Aeq,-Aeq]))
+    b = matrix(cvx.matrix([b,beq,-beq]))
+    A = matrix(cvx.matrix([A]))
+    b = matrix(cvx.matrix([b,beq,-beq]))
+	# Convert to 2-additive for vertex search simplification
+	#
+    A, b, bas = convert2kadd(A,b)
+    bas.insert(0,0)
+    p = Hrep(A, b)
+    Vm = array(p.generators)
+    # print Vm
+    Vm = convertnadd(Vm,bas)
+    #
+    # Split vertices into convex and nonconvex and call find_cap for each permutation
+    #
+    sols = []
+    n = int(log2(shape(Vm)[1]))
+    Ac = convexity(int(pow(2,n)))
+    Ac = matrix(cvx.matrix(Ac))
+    base = [int(pow(2,i)) for i in range(n)]
+    Vm_conv = []
+    Vm_nonconv = []
+    for i in range(shape(Vm)[0]):                                          # test for 2-monotonicity, separate into 2 arrays
+        if shape(nonzero(dot(Ac,Vm[i,:])<-0.00000001)[0])[1]:
+            Vm_nonconv.append(Vm[i,:])
+        else:
+            Vm_conv.append(Vm[i,:])
+    Vm_conv=array(Vm_conv)
+    Vm_nonconv=array(Vm_nonconv)
+    Uc_conv = [[chq.Choquet(array(chq.max_choquet(p)),p),p] for p in Vm_conv]
+    Uc_nonconv = [[chq.Choquet(array(chq.max_choquet_glob(p)),p),p] for p in Vm_nonconv]
+    Z = zeta_matrix(int(pow(2,n)))
+    for perm in permutations(base):
+        print perm
+        Uc_necmeas = [[p[0],nec_measure(p[1],perm,Z)] for p in Uc_nonconv]
+        Uc_necmeas.extend(Uc_conv)
+        Gmax = array([i[0] for i in Uc_necmeas])
+        Vconv = array([i[1] for i in Uc_necmeas])
+        obj_d,rcap = find_cap(Vconv,Gmax)
+        sols.append((obj_d,rcap))
+	sols.sorted(key=operator.itemgetter(0))
+	print sols
+	vr = sols[0]
+    return vr
+    
+# A, b, bas = convert2kadd(A,b)
+# bas.insert(0,0)
+# A_red = hstack([b, -A])
+# print A_red
+# print shape(A_red)
+# Vm = genfromtxt('/home/gb/Documents/papers/FSS_LINZ/cdd/shapley4_1-02_red.mat')
+# Vm = convertnadd(Vm,bas)
+
+
+###########################
+##### single-permutation
+###########################
+# n = int(log2(shape(Vm)[1]))
+# Ac = convexity(int(pow(2,n)))
+# Ac = matrix(cvx.matrix(Ac))
+# base = [int(pow(2,i)) for i in range(n)]
+# Vm_conv = []
+# Vm_nonconv = []
+# for i in range(shape(Vm)[0]):                                          # test for 2-monotonicity, separate into 2 arrays
+#     if shape(nonzero(dot(Ac,Vm[i,:])<-0.00000001)[0])[1]:
+#         Vm_nonconv.append(Vm[i,:])
+#     else:
+#         Vm_conv.append(Vm[i,:])
+# Z = zeta_matrix(int(pow(2,n)))
+# perm = (1,8,2,4)
+# Vm_necmeas = [nec_measure(p,perm,Z) for p in Vm_nonconv]
+# Vm_necmeas.extend(Vm_conv)
+# Vm_necmeas=array(Vm_necmeas)
+# print Vm_necmeas
+# gm_conv = [chq.Choquet(array(chq.max_choquet(p)),p) for p in Vm_conv]
+# gm_nonconv = [chq.Choquet(array(chq.max_choquet_glob(p)),p) for p in Vm_nonconv]
+# gm_nonconv.extend(gm_conv)
+# gm_nonconv = array(gm_nonconv)
+# print gm_nonconv
+# vr,rmix=find_cap(Vm_necmeas,gm_nonconv)
+# print chq.max_choquet(vr)
+
+# Vm1 = array([rmix[i]*Vm[i,:] for i in range(len(rmix))])
+# vgr = array([sum(Vm1[:,i]) for i in range(16)])
+
+# for i in range(shape(Vm)[0]):                                          # test for 2-monotonicity, separate into 2 arrays
+#     if shape(nonzero(dot(Ac,Vm[i,:])<-0.00000001)[0])[1]:
+#         print "Global"
+#         print chq.Choquet(array(chq.max_choquet_glob(Vm[i,:])),Vm[i,:]) - chq.Choquet(glob_max,Vm[i,:])
+#         print "Robust"
+#         print chq.Choquet(array(chq.max_choquet_glob(Vm[i,:])),Vm[i,:]) - chq.Choquet(loc_max,Vm[i,:])
+#     else:
+#         print "Global"
+#         print chq.Choquet(array(chq.max_choquet(Vm[i,:])),Vm[i,:]) - chq.Choquet(glob_max,Vm[i,:])
+#         print "Robust"
+#         print chq.Choquet(array(chq.max_choquet(Vm[i,:])),Vm[i,:]) - chq.Choquet(loc_max,Vm[i,:])
+
+
+##############################################
+#### end
+##############################################
+
 
 
 
 ###### test results
 ##### n=4
-### 1-0.2 (60, 16)
-# [0.25000000000195693,
-#    0.24999999999933609,
-#    0.24999999999933989,
-#    0.24999999999936712],
-#   0.25374453730437979
-### 1-0.2, 2-0.3 (68, 16)
-# ([0.23200052734690277,
-#    0.36715555927081928,
-#    0.20042195669113913,
-#    0.20042195669113888],
-#   0.18023785440450746)
-### 1-0.2, 2-0.3, 3-0.1 (72, 16)
-# ([0.26759760202583915,
-#    0.19720710515208287,
-#    0.26759769149070389,
-#    0.26759760133137411],
-#   0.080196385759149863)
+### 1-0.2 (60, 16) FC
+# [0.067862569909373741,
+#    0.31071247669672775,
+#    0.31071247669689966,
+#    0.31071247669699886],
+#   0.34392421166929649)]
+### 1-0.2, 2-0.3 (68, 16) FC
+# [0.092573637457428859,
+#    0.17918015578706173,
+#    0.36412310337775328,
+#    0.36412310337775622],
+#   0.28563376714613425)]
+### 1-0.2, 2-0.3, 3-0.1 (72, 16) FC
+ # ([0.18778767972060673,
+ #   0.27915457200152449,
+ #   0.023332286749396542,
+ #   0.5097254615284722],
+ #  0.1391229510900707)]
+
 
 ##### n=5
-### 1-0.2 (140)
-# [0.19999999999993406,
-#    0.20000000000001653,
-#    0.2000000000000163,
-#    0.20000000000001641,
-#    0.20000000000001664],
-#   0.33018962065833857)]
+### 1-0.2 (140) FC
+ # ([0.032822087620647498,
+ #   0.24179447809472968,
+ #   0.241794478094886,
+ #   0.24179447809486782,
+ #   0.24179447809486912],
+ #  0.43435182954133417)
 ###
-### 1-0.2, 2-0.3 (228)
-# [0.15389294589885175,
-#    0.15389294589746672,
-#    0.15389294590364666,
-#    0.3844282163963883,
-#    0.15389294590364649],
-#   0.26581136651920195)]
+### 1-0.2, 2-0.3 (228) FC
+# ([0.35704201479785341,
+#    0.29268492617022696,
+#    0.11675768634389602,
+#    0.11675768634406954,
+#    0.1167576863439542],
+#   0.33661625336665091)### 1-0.2, 2-0.3, 3-0.1 (648) FC
+# [0.084977758369359724,
+#    0.41377953465179151,
+#    0.080479779281832378,
+#    0.21038146384850179,
+#    0.21038146384851467],
+#   0.26476353066627256)]
