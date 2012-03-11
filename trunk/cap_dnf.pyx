@@ -59,7 +59,7 @@ cdef np.ndarray[np.float64_t, ndim=1] zeta(np.ndarray[np.float64_t, ndim=1] cap)
 
 cdef np.ndarray[np.float64_t, ndim=1] to_bel(np.ndarray[np.float64_t, ndim=1] cap,np.ndarray[np.int_t, ndim=2] A):
     """
-    Generates a belief function from set of constraints (simplex subset)
+    Generates a belief function (bT) from set of constraints (R subset)
     """
 #    cdef float t0 = time()
     cdef np.ndarray[np.float64_t, ndim=1] capnew = np.zeros(len(cap))
@@ -85,7 +85,8 @@ cdef np.ndarray[np.float64_t, ndim=1] to_bel(np.ndarray[np.float64_t, ndim=1] ca
 
 def cap_dnf(np.ndarray[np.float64_t, ndim=1] cap, int S,np.ndarray[np.int_t, ndim=2] cmatr ,list result = []):
     """
-    Breaks a non-convex capacity into convex subsets
+    Breaks a non-convex capacity into convex subsets. Employs splitting algo from 
+    M. Timonin, Maximization of the Choquet integral over a convex set and its application to resource allocation problems, Annals of Operations Research.
     """
     cdef int i = 0
     cdef int p = 0
