@@ -69,7 +69,6 @@ def k_additivity(m,k):
     A = cvx.spmatrix(x,I,J)
     return A
 
-
 def limits(m):
     """
    Input: m=2^dim, Output: matrix of ones on a diagonal 
@@ -91,6 +90,7 @@ def shapley(m,el):
     """
     Input: m=2^dim, el \in [0,dim]. Output: Shapley coefficient vector S for a particular criterion el. <S,v> = sh(el)
     """
+    el = 1 << el-1                          # convert criterion index to binary bit position, eg 5 -> 10000  (i.e. do 2^(i-1))
     x = []
     I = []
     J = []
@@ -103,80 +103,11 @@ def shapley(m,el):
     A = cvx.spmatrix(x,I,J)
     return A  
 
-def gen_inequalities(dim, Shapl_dict = {}, II_dict = {}, convex=0):
-    """
-    Input: dim, Shapley values structure, II values structure, convexity flag
-    calls the appropriate procedures
-    Output: Matrix and a column, Av<b
-    """
-    if convex:
-        A = cvx.sparse([-convexity(2**dim),-limits(2**dim)])
-        b = cvx.matrix(0,(A.size[0],1),"d")
-    else:
-        A = cvx.sparse([-monotonicity(2**dim),-limits(2**dim)])
-        b = cvx.matrix(0,(A.size[0],1),"d")
-    if Shapl_dict['Sh_order']:
-        Sh_diffs = - cvx.matrix([shapley(2**dim,p[0]) - shapley(2**dim,p[1]) for p in Shapl_dict['Sh_order']])
-        b_sh_diffs = - cvx.matrix(Shapl_dict['Sh_delta'],(Sh_diffs.size[0],1),"d")
-        A = cvx.sparse([A, Sh_diffs])
-        b = cvx.matrix([b,b_sh_diffs])
-    if Shapl_dict['Sh_equal']:
-        Sh_eq1 = cvx.matrix([shapley(2**dim,p[0]) - shapley(2**dim,p[1]) for p in Shapl_dict['Sh_equal']])
-        b_sh_eq1 = cvx.matrix(Shapl_dict['Sh_delta'],(Sh_eq1.size[0],1),"d")
-        # -Sh_eq2 < delta
-        Sh_eq2 = - cvx.matrix([shapley(2**dim,p[0]) - shapley(2**dim,p[1]) for p in Shapl_dict['Sh_equal']])
-        b_sh_eq2 = cvx.matrix(Shapl_dict['Sh_delta'],(Sh_eq2.size[0],1),"d")
-        A = cvx.sparse([A, Sh_eq1, Sh_eq2])
-        b = cvx.matrix([b, b_sh_eq1, b_sh_eq2])
-    if II_dict['ii_values']:
-        II_vals = - cvx.matrix([int_index(2**dim,p[0]) for p in II_dict['ii_values']])
-        b_ii_vals = - cvx.matrix([p[1] for p in II_dict['ii_values']])
-        A = cvx.sparse([A, II_vals])
-        b = cvx.matrix([b,b_ii_vals])
-    if II_dict['ii_order']:
-        II_diffs = - cvx.matrix([int_index(2**dim,p[0]) - int_index(2**dim,p[1]) for p in II_dict['ii_order']])
-        b_ii_diffs = - cvx.matrix(II_dict['ii_delta'],(II_diffs.size[0],1),"d")
-        A = cvx.sparse([A, II_diffs])
-        b = cvx.matrix([b,b_ii_diffs])
-    if II_dict['ii_positive']:
-        II_positive = -cvx.matrix([int_index(2**dim,p) for p in II_dict['ii_positive']])
-        b_ii_positive = - cvx.matrix(II_dict['ii_delta'],(II_positive.size[0],1),"d")
-        A = cvx.sparse([A, II_positive])
-        b = cvx.matrix([b, b_ii_positive])
-    if II_dict['ii_negative']:
-        II_negative = cvx.matrix([int_index(2**dim,p) for p in II_dict['ii_negative']])
-        b_ii_negative = - cvx.matrix(II_dict['ii_delta'],(II_negative.size[0],1),"d")
-        A = cvx.sparse([A, II_negative])
-        b = cvx.matrix([b, b_ii_negative])
-    return A,b
-
-def gen_equalities(dim,Shpl,II = [], Necessity = [], Sufficiency = [], k_additive=0 ):
-    """
-    Input: dim, Shapley values structure, II values structure, Necessity criteria, Sufficiency criteria,k-additivity
-    calls the appropriate procedures
-    Output: Matrix and a column, Aeq*v=beq
-    """
-    Alist = [equalities(2**dim)]
-    Alist.extend([shapley(2**dim,p[0]) for p in Shpl])
-    Aeq = cvx.sparse(Alist)
-    blist = [0.,1]
-    blist.extend([p[1] for p in Shpl])
-    beq = cvx.matrix(blist)
-    if Necessity:
-        Aeq = cvx.sparse([Aeq, necessity(2**dim,Necessity)])
-        beq = cvx.matrix([beq, cvx.matrix(0.,(size(Aeq)[0]-size(beq)[0],1))])
-    if Sufficiency:
-        Aeq = cvx.sparse([Aeq, sufficiency(2**dim,Sufficiency)])
-        beq = cvx.matrix([beq, cvx.matrix(1.,(size(Aeq)[0]-size(beq)[0],1))])
-    if k_additive:
-        Aeq = cvx.sparse([Aeq, k_additivity(2**dim,k_additive)])
-        beq = cvx.matrix([beq, cvx.matrix(0.,(size(Aeq)[0]-size(beq)[0],1))])
-    return Aeq,beq
-
 def int_index(m,el_pair):
     """
     Input: m=2^dim, el_pair \in [0,dim]^2. Output: II coefficient vector II for a particular criterion el. <II,v> = II(el1,el2)
     """
+    el_pair = tuple(1 << i-1 for i in el_pair)   # convert criterion index to binary bit position, eg 5 -> 10000  (i.e. do 2^(i-1))
     x = []
     I = []
     J = []
@@ -193,6 +124,7 @@ def necessity(m,els):
     """
     Input: m=2^dim, els - list of neccessary subsets. Output: matrix with ones for A not including any of els. 1 set per row
     """
+    els = [1 << i-1 for i in els]         # convert criterion index to binary bit position, eg 5 -> 10000  (i.e. do 2^(i-1))
     x = []
     I = 0
     J = []
@@ -208,6 +140,7 @@ def sufficiency(m,els):
     """
     Input: m=2^dim, els - list of sufficient subsets. Output: matrix with ones for A including any of els. 1 set per row
     """
+    els = [1 << i-1 for i in els]         # convert criterion index to binary bit position, eg 5 -> 10000  (i.e. do 2^(i-1))
     x = []
     I = 0
     J = []
@@ -219,3 +152,79 @@ def sufficiency(m,els):
                 J.extend([i]) 
     A = cvx.spmatrix(x,range(I),J,(I,m))
     return A
+
+def gen_inequalities(dm_info, convex=0):
+    """
+    Input: dim, Shapley values structure, II values structure, convexity flag
+    calls the appropriate procedures
+    Output: Matrix and a column, Av<=b
+    """
+    dim = len(dm_info['criteria_functions'])
+    if convex:
+        A = cvx.sparse([-convexity(2**dim),-limits(2**dim)])
+        b = cvx.matrix(0,(A.size[0],1),"d")
+    else:
+        A = cvx.sparse([-monotonicity(2**dim),-limits(2**dim)])
+        b = cvx.matrix(0,(A.size[0],1),"d")
+    if 'Sh_order' in dm_info:   
+        Sh_diffs = - cvx.matrix([shapley(2**dim,p[0]) - shapley(2**dim,p[1]) for p in dm_info['Sh_order']])
+        b_sh_diffs = - cvx.matrix(dm_info['Sh_delta'],(Sh_diffs.size[0],1),"d")
+        A = cvx.sparse([A, Sh_diffs])
+        b = cvx.matrix([b,b_sh_diffs])
+    if 'Sh_equal' in dm_info:
+        Sh_eq1 = cvx.matrix([shapley(2**dim,p[0]) - shapley(2**dim,p[1]) for p in dm_info['Sh_equal']])
+        b_sh_eq1 = cvx.matrix(dm_info['Sh_delta'],(Sh_eq1.size[0],1),"d")
+        # -Sh_eq2 < delta
+        Sh_eq2 = - cvx.matrix([shapley(2**dim,p[0]) - shapley(2**dim,p[1]) for p in dm_info['Sh_equal']])
+        b_sh_eq2 = cvx.matrix(dm_info['Sh_delta'],(Sh_eq2.size[0],1),"d")
+        A = cvx.sparse([A, Sh_eq1, Sh_eq2])
+        b = cvx.matrix([b, b_sh_eq1, b_sh_eq2])
+    if 'ii_values' in dm_info:
+        II_vals = - cvx.matrix([int_index(2**dim,p[0]) for p in dm_info['ii_values']])
+        b_ii_vals = - cvx.matrix([p[1] for p in dm_info['ii_values']])
+        A = cvx.sparse([A, II_vals])
+        b = cvx.matrix([b,b_ii_vals])
+    if 'ii_order' in dm_info:
+        print dm_info['ii_order']
+        II_diffs = - cvx.matrix([int_index(2**dim,p[0]) - int_index(2**dim,p[1]) for p in dm_info['ii_order']])
+        b_ii_diffs = - cvx.matrix(dm_info['ii_delta'],(II_diffs.size[0],1),"d")
+        A = cvx.sparse([A, II_diffs])
+        b = cvx.matrix([b,b_ii_diffs])
+    if 'ii_positive' in dm_info:
+        II_positive = -cvx.matrix([int_index(2**dim,p) for p in dm_info['ii_positive']])
+        b_ii_positive = - cvx.matrix(dm_info['ii_delta'],(II_positive.size[0],1),"d")
+        A = cvx.sparse([A, II_positive])
+        b = cvx.matrix([b, b_ii_positive])
+    if 'ii_negative' in dm_info:
+        II_negative = cvx.matrix([int_index(2**dim,p) for p in dm_info['ii_negative']])
+        b_ii_negative = - cvx.matrix(dm_info['ii_delta'],(II_negative.size[0],1),"d")
+        A = cvx.sparse([A, II_negative])
+        b = cvx.matrix([b, b_ii_negative])
+    return A,b
+
+def gen_equalities(dm_info, k_additive=0 ):
+    """
+    Input: dm_info(criteria functions, Shapley values structure, II values structure, Necessity criteria, Sufficiency criteria), k-additivity
+    Generate matrix rows for different information classes
+    Output: Matrix and a column, Aeq*v=beq
+    """
+    dim = len(dm_info['criteria_functions'])
+    Alist = [equalities(2**dim)]
+    blist = [0.,1]
+    if 'Sh_values' in dm_info:
+        Alist.extend([shapley(2**dim,p[0]) for p in dm_info['Sh_values']])
+        blist.extend([p[1] for p in dm_info['Sh_values']])
+    Aeq = cvx.sparse(Alist)
+    beq = cvx.matrix(blist)
+    if 'necessity' in dm_info:
+        Aeq = cvx.sparse([Aeq, necessity(2**dim,dm_info['necessity'])])
+        beq = cvx.matrix([beq, cvx.matrix(0.,(size(Aeq)[0]-size(beq)[0],1))])
+    if 'sufficiency' in dm_info:
+        Aeq = cvx.sparse([Aeq, sufficiency(2**dim,dm_info['sufficiency'])])
+        beq = cvx.matrix([beq, cvx.matrix(1.,(size(Aeq)[0]-size(beq)[0],1))])
+    if k_additive:
+        Aeq = cvx.sparse([Aeq, k_additivity(2**dim,k_additive)])
+        beq = cvx.matrix([beq, cvx.matrix(0.,(size(Aeq)[0]-size(beq)[0],1))])
+    return Aeq,beq
+
+
