@@ -7,24 +7,28 @@ from choquet_base import Choquet,Mobius,bitCount,Ch_gradient,MobiusB,Choquet_per
 from numpy import *
 from itertools import *
 from collections import defaultdict
-import networkx as nx
+import operator
 from cap_dnf import cap_dnf
 from math import factorial
-#import math as math
 import random as rnd
 import cvxopt as cvx
 from cvxopt import solvers
 from scipy.optimize import fmin_slsqp
-#from openopt import NSP
 from time import time
+from openopt import NSP
+from scipy import *
+from capacity_parameters import *
+#from fss_test import v, zeros, dot, shape
+#import networkx as nx
+#import math as math
+#from openopt import NSP
 #cvx.solvers.options['LPX_K_MSGLEV'] = 0
 ### Constants
-dim = 6
+dim = 4
 Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-x)]
 #Fx = [lambda x: -0.029335929406647*pow(x,6) + 0.207346406139707*pow(x,5) - 0.579333438490725*pow(x,4) + 0.821527980327791*pow(x,3) - 0.698397454788673*pow(x,2)  + 0.687228652793793*x, lambda x: -0.027728205126421*pow(x,6) + 0.197460701672059*pow(x,5) - 0.567139344258168*pow(x,4) + 0.888084577320966*pow(x,3) - 1.002827533837975*pow(x,2)  + 1.152014732068982*x,lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
 #dFx = [lambda x: -0.029335929406647*6*pow(x,5) + 0.207346406139707*5*pow(x,4) - 0.579333438490725*4*pow(x,3) + 0.821527980327791*3*pow(x,2) - 0.698397454788673*2*x  + 0.687228652793793, lambda x: -0.027728205126421*6*pow(x,5) + 0.197460701672059*5*pow(x,4) - 0.567139344258168*4*pow(x,3) + 0.888084577320966*3*pow(x,2) - 1.002827533837975*2*x  + 1.152014732068982, lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x)]
 #######
-
 
 
 #def MobiusB(x):
@@ -44,6 +48,9 @@ Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambd
 ##    return array(f)  # Pure Mosek
 
 def Shapley_vals(cap):
+    """
+    Calculates Shapley values for a given capacity
+    """
     m = len(cap)
     for el in range(int(log2(m))):
         el=pow(2,el)
@@ -70,7 +77,7 @@ def MobiusC(x):
 
 def find_centre():
     """
-    Finds the centre point
+    Finds the point f_1 = ... = f_n by optimizing a capacity having v(A)=0,forall A \neq N
     """
     capacity = zeros(2**dim)
     capacity[-1] = 1
@@ -79,34 +86,23 @@ def find_centre():
     return centre, val_centre
 
 def cap_dnf_t(cap,S,cmatr = zeros((dim,dim)),result = []):
+    """
+    Finds the point f_1 = ... = f_n by optimizing a capacity having v(A)=0,forall A \neq N
+    """
     print "IN CAPDNF"
     t0 = time()
     result = cap_dnf(cap,S,cmatr = zeros((dim,dim),dtype=int),result = [])
     print "TIME CAP_DNF", time()-t0
     print shape(result)
     return result
-"""
-def max_choquet_00(capacity):
-#    print capacity
-    x0 = [0.2, 0.3, 0.5]
-    A = -eye(dim)
-    b = zeros(dim)
-    Aeq = ones(dim)
-    beq = 1
-    cwrap_vx = lambda x: Choquet(x,capacity)
-    x_opt = NSP(cwrap_vx, x0, A=A, b=b, Aeq=Aeq, beq=beq)
-    r = x_opt.maximize('ralg')
-    return r.xf
-"""
+
 #Budg = 1
 
 def max_choquet(capacity,Budg = 1):
-#    x0 = [0,0.2,0.3,0.5]
+    """
+    Calculates the integral maximum
+    """
     x0 = zeros(dim+1)
-#    x0 = [0,1./3,1./3,1./3]
-#    x0 = [1,0.,0,1]
-#    x0 = [1,0.25,0.25,0.25,0.25]
-#    x0 = [1,0.2,0.2,0.2,0.2,0.2]
     def f_eqcons(x):
         Aeq = ones(len(x)-1)
         beq = Budg
@@ -139,14 +135,12 @@ def max_choquet(capacity,Budg = 1):
 #    t0 = time()
 #    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,iprint=2,full_output=1)
     sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-11,iter=300)
-#    a = time()-t0
-#    print a, sol[1]
-#    print sol
-#    if a > 2:
-#        print capacity
     return sol[0][1:]
     
 def solve_mmax(Umm,Budg = 1):
+    """
+    Solves mmax regret problem. Input: array of pairs (maximizer, capacity)
+    """
     x0 = zeros(dim+1)
 #    x0 = [0,0.1,0.2,0.3,0.4]
     
@@ -188,7 +182,7 @@ def solve_mmax(Umm,Budg = 1):
 
 def node_val(G,n,f_vals):
     """
-    G - graph, n - the root node
+    G - graph, n - the root node. Calculates its value based on values of all children
     """
     G_pred = G.node[n]['psorted']
     if not G_pred:
@@ -209,7 +203,7 @@ def node_val(G,n,f_vals):
 
 def max_tree(G,n,fsorted,Budg = 1, x0 = array([])):
     """
-    G - graph, n - the root node
+    G - graph, n - the root node. Maximizes the function value at node n, distributing Budg between children
     """
     if not x0.shape[0]:
         x0 = zeros(len(fsorted)+1)
@@ -250,7 +244,7 @@ def max_tree(G,n,fsorted,Budg = 1, x0 = array([])):
     fprime_ineqcons_w = lambda x: fprime_ineqcons(x,G,n,fsorted)
 #    t0 = time()
 #    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,iprint=2,full_output=1,epsilon=4e-08)
-    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=2,full_output=1,acc=1e-13,iter=3000)
+    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=1,full_output=1,acc=1e-13,iter=3000)
 #    a = time()-t0
 #    print a, sol[1]
 #    print sol
@@ -272,6 +266,9 @@ def simpl_project(x):
     return array([max(p-th,0) for p in x])
 
 def max_choquet_sbgr(G,n,fsorted):
+    """
+    subgradient projection maximization. Expects graph, node, and list of grpah functions as input
+    """
     x =zeros(len(fsorted))
     iter = 10000
     fbest = 0
@@ -294,3 +291,142 @@ def max_choquet_sbgr(G,n,fsorted):
             fbest = f
             xbest = x
     return fbest, xbest
+
+def max_dual(cap_array,Budg = 1):
+    """
+    Theoretically calculates min(z^r)->max(lambda) i.e. the dual problem solution, but in fact does not work
+    """
+    x0 = array([1./shape(cap_array)[0] for i in range(shape(cap_array)[0])])
+    print x0
+    def f_eqcons(x):
+#        Aeq = ones(len(x))
+        beq = 1
+        print "ARRR", array([sum(x)-beq])
+        return array([sum(x)-beq])
+
+    def fprime_eqcons(x):
+        return -ones(len(x))
+
+    def f_ineqcons(x):
+        return x
+        
+    def fprime_ineqcons(x):
+        #A = append(-1,Ch_gradient(x[1:], capacity))
+        B = diag(ones(len(x)))        
+        #C = -diag(ones(len(x)))
+        #D = vstack((A,B,C))
+        return  B
+
+    def fprime(x,cap_array,Budg):
+        cap_int = dot(cap_array.T,x)
+        x_int = array(max_choquet(cap_int,Budg))
+        ch_diffs = array([Choquet(x_int,v) - Choquet(array(max_choquet(v,Budg)),v) for v in cap_array])
+        print "GRAD"
+        return ch_diffs
+
+    def objfunc(x,cap_array,Budg):
+        cap_int = dot(cap_array.T,x)
+        x_int = array(max_choquet(cap_int,Budg))
+        ch_diffs = array([Choquet(x_int,v) - Choquet(array(max_choquet(v,Budg)),v) for v in cap_array])
+        print dot(x, ch_diffs) 
+        return dot(x, ch_diffs)
+    
+    objfunc_w = lambda x: objfunc(x,cap_array,Budg)
+    fprime_w = lambda x: fprime(x,cap_array,Budg)
+#    sol = fmin_slsqp(objfunc_w,x0, fprime=fprime_w, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons, iprint=2,full_output=1,iter=300)
+    sol = fmin_slsqp(objfunc_w,x0, fprime=fprime_w, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons, iprint=2,full_output=1,acc=1e-11,iter=300)
+    print sol
+    return sol[0][1:]
+
+
+def max_choquet_glob(capacity):
+    """
+    Calculates the global maximum of Choq. w.r.t any capacity by decomposing into convex parts
+    """
+    mcap = Mobius(capacity)
+    sols = [[max_choquet(p),p] for p in cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((dim,dim),dtype=int),result = [])]
+    s1 = [[Choquet(array(p[0]),p[1]),p[0]] for p in sols]
+    return max(s1, key=operator.itemgetter(0))[1]
+    
+def solve_mmax_wval(Umm,Budg = 1):
+    """
+    In this version Umm is suppposed to hold a VALUE in [0]s, not the point
+    """
+    x0 = zeros(dim+1)
+#    x0 = [0,0.1,0.2,0.3,0.4]
+    
+    def f_eqcons(x):
+        Aeq = ones(len(x)-1)
+        beq = Budg
+        return array([dot(Aeq,x[1:])-beq])
+    
+    def fprime_eqcons(x):
+        return append(0,ones(len(x)-1))
+    
+    def f_ineqcons(x,Umm):
+        A = [x[0] - (p - Choquet(x[1:],v)) for p,v in Umm]
+        A.extend(x)
+#        A.extend(x[1:])
+        return array(A)
+    
+    def f_ineqcons_prime(x,Umm):
+        A = array([append(1,Ch_gradient(x[1:], v)) for p,v in Umm])
+        B = diag(ones(len(x)))        
+        D = vstack((A,B))
+        return  D
+    
+    def fprime(x):
+        return append(1,zeros(len(x)-1))
+
+    def objfunc(x):
+        return x[0]
+    
+    f_ineqcons_w = lambda x: f_ineqcons(x,Umm)
+    fprime_ineqcons_w = lambda x: f_ineqcons_prime(x,Umm)
+#    print capacity
+    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons, fprime_ieqcons = fprime_ineqcons_w, iprint=2,full_output=1,acc=1e-11,iter=900)
+#    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons, iprint=2,full_output=1,acc=1e-11,iter=900)
+    print sol
+    return sol[0][1:],sol[1]
+
+
+def solve_dual(cap_array,gm):
+    """
+    Input: array of tuples (capacity (e.g. vertices of U) or its nec.measure component, global maximum)
+    Finds the robust capacity, i.e. the solution of dual problem
+    Capacities assumed to be 2-MONOTONE
+    Output: v^r
+    """
+    Budg = 1  
+    x0 = array([1./shape(cap_array)[0] for i in range(shape(cap_array)[0])])
+#    print x0
+    Aeq = ones(shape(cap_array)[0])
+    beq = 1
+    A = diag(-ones(shape(cap_array)[0]))
+    b = zeros(shape(cap_array)[0])
+    vmax=gm
+    # vmax = array([chq.Choquet(array(chq.max_choquet(v,Budg)),v) for v in cap_array])
+    
+    def fprime(x,cap_array,Budg):
+        cap_int = dot(cap_array.T,x)
+        x_int = array(max_choquet(cap_int,Budg))
+        ch_xr = array([Choquet(x_int,v) for v in cap_array])
+        ch_diffs = ch_xr - vmax
+        return ch_diffs
+
+    def objfunc(x,cap_array,Budg):
+        cap_int = dot(cap_array.T,x)
+        x_int = array(max_choquet(cap_int,Budg))
+        ch_xr = array([Choquet(x_int,v) for v in cap_array])
+        ch_diffs = ch_xr - vmax
+#        print  dot(x, ch_diffs)
+        return dot(x, ch_diffs)
+    
+    objfunc_w = lambda x: objfunc(x,cap_array,Budg)
+    fprime_w = lambda x: fprime(x,cap_array,Budg)
+    
+    p = NSP(objfunc_w, x0, df=fprime_w,  A=A,  b=b,  Aeq=Aeq,  beq=beq, iprint = 25, maxIter = 300, maxFunEvals = 1e7, diffint=1e-10, xtol=1e-9,ftol=1e-9,gtol=1e-5)
+    r = p.solve('algencan')
+    print r.xf, r.ff
+    cap_mix = dot(cap_array.T, array(r.xf))
+    return r.ff,r.xf

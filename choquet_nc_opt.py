@@ -1,5 +1,4 @@
 import sys
-sys.path.append('/home/gb/Downloads/science/algencan-2.3.7/bin/py')
 import pdb
 from numpy import *
 from scipy import *
@@ -14,6 +13,8 @@ import operator
 import Choquet_toolpack as chq
 from capacity_parameters import *
 from time import time
+import Choquet_toolpack
+sys.path.append('/home/gb/Downloads/science/algencan-2.3.7/bin/py')
 #from enthought.mayavi.mlab import *
 
 set_printoptions(edgeitems='Inf',linewidth=200,suppress=True)
@@ -37,48 +38,7 @@ v = zeros(n)
 # print array([chq.Choquet(array(chq.max_choquet(v,1)),v) - chq.Choquet(array(x_cap_r),v) for v in Vm])
 
 
-def find_cap(cap_array,gm):
-    """
-    Input: array of tuples (capacity (e.g. vertices of U) or its nec.measure component, global maximum)
-    Finds the robust capacity, i.e. the solution of dual problem
-    Capacities assumed to be 2-MONOTONE
-    Output: v^r
-    """
-    Budg = 1  
-    x0 = array([1./shape(cap_array)[0] for i in range(shape(cap_array)[0])])
-#    print x0
-    Aeq = ones(shape(cap_array)[0])
-    beq = 1
-    A = diag(-ones(shape(cap_array)[0]))
-    b = zeros(shape(cap_array)[0])
-    vmax=gm
-    # vmax = array([chq.Choquet(array(chq.max_choquet(v,Budg)),v) for v in cap_array])
-    
-    def fprime(x,cap_array,Budg):
-        cap_int = dot(cap_array.T,x)
-        x_int = array(chq.max_choquet(cap_int,Budg))
-        ch_xr = array([chq.Choquet(x_int,v) for v in cap_array])
-        ch_diffs = ch_xr - vmax
-        return ch_diffs
-
-    def objfunc(x,cap_array,Budg):
-        cap_int = dot(cap_array.T,x)
-        x_int = array(chq.max_choquet(cap_int,Budg))
-        ch_xr = array([chq.Choquet(x_int,v) for v in cap_array])
-        ch_diffs = ch_xr - vmax
-#        print  dot(x, ch_diffs)
-        return dot(x, ch_diffs)
-    
-    objfunc_w = lambda x: objfunc(x,cap_array,Budg)
-    fprime_w = lambda x: fprime(x,cap_array,Budg)
-    
-    p = NSP(objfunc_w, x0, df=fprime_w,  A=A,  b=b,  Aeq=Aeq,  beq=beq, iprint = 25, maxIter = 300, maxFunEvals = 1e7, diffint=1e-10, xtol=1e-9,ftol=1e-9,gtol=1e-5)
-    r = p.solve('algencan')
-    print r.xf, r.ff
-    cap_mix = dot(cap_array.T, array(r.xf))
-    return r.ff,r.xf
-
-# cap_mix = find_cap(Vm)
+# cap_mix = solve_dual(Vm)
 # x_cap_mix = chq.max_choquet(cap_mix)
 # print "DIFFS ROBUST CAP"
 # print array([chq.Choquet(array(chq.max_choquet(v,1)),v) - chq.Choquet(array(x_cap_mix),v) for v in Vm])
@@ -110,7 +70,7 @@ def zeta_matrix(n):
                 Z[j,i] = 1
     return Z
 
-def ncmmax(Vm):
+def nc_primal(Vm):
     """
     Nonconvex minimax - for a matrix of capacities finds all nonconvex rows, and for all permutations generates necessity measures for them. Then solves mmax for the resulting matrix
     """
@@ -137,7 +97,7 @@ def ncmmax(Vm):
         Uc_necmeas.extend(Uc_conv)
         Gmax = array([i[0] for i in Uc_necmeas])
         Vconv = array([i[1] for i in Uc_necmeas])
-        rcap,rmix = fggind_cap(Vconv,Gmax)
+        rcap,rmix = Choquet_toolpack.solve_dual(Vconv,Gmax)
         sol = list(chq.solve_mmax_wval(Uc_necmeas))
         sol.extend([chq.max_choquet(rcap),rcap, perm])
         sols.append(sol)
@@ -216,28 +176,11 @@ def nec_measure(capacity,perm,Z):
     return dot(necmeas,Z)
 
 
-def solve_dual(A,b,Aeq,beq,f,Z):
+def nc_dual(Vm,f,Z):
     """
     dual solving for nonconvex capacities
-    actually a wrapper around find_cap (calls it for each permutation)
+    actually a wrapper around solve_dual (calls it for each permutation)
     """
-    # Convert A,b,Aeq,beq to Ax<=b form, reduce to 2add and calculate vertices
-    #
-    A = matrix(cvx.matrix([A,Aeq,-Aeq]))
-    b = matrix(cvx.matrix([b,beq,-beq]))
-    A = matrix(cvx.matrix([A]))
-    b = matrix(cvx.matrix([b,beq,-beq]))
-	# Convert to 2-additive for vertex search simplification
-	#
-    A, b, bas = convert2kadd(A,b)
-    bas.insert(0,0)
-    p = Hrep(A, b)
-    Vm = array(p.generators)
-    # print Vm
-    Vm = convertnadd(Vm,bas)
-    #
-    # Split vertices into convex and nonconvex and call find_cap for each permutation
-    #
     sols = []
     n = int(log2(shape(Vm)[1]))
     Ac = convexity(int(pow(2,n)))
@@ -261,7 +204,7 @@ def solve_dual(A,b,Aeq,beq,f,Z):
         Uc_necmeas.extend(Uc_conv)
         Gmax = array([i[0] for i in Uc_necmeas])
         Vconv = array([i[1] for i in Uc_necmeas])
-        obj_d,rcap = find_cap(Vconv,Gmax)
+        obj_d,rcap = Choquet_toolpack.solve_dual(Vconv,Gmax)
         sols.append((obj_d,rcap))
 	sols.sorted(key=operator.itemgetter(0))
 	print sols
@@ -302,7 +245,7 @@ def solve_dual(A,b,Aeq,beq,f,Z):
 # gm_nonconv.extend(gm_conv)
 # gm_nonconv = array(gm_nonconv)
 # print gm_nonconv
-# vr,rmix=find_cap(Vm_necmeas,gm_nonconv)
+# vr,rmix=solve_dual(Vm_necmeas,gm_nonconv)
 # print chq.max_choquet(vr)
 
 # Vm1 = array([rmix[i]*Vm[i,:] for i in range(len(rmix))])

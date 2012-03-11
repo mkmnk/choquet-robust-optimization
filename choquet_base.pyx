@@ -25,6 +25,9 @@ def argsort(seq):
     return sorted(range(len(seq)), key=seq.__getitem__)
 
 cpdef int bitCount(int int_type) except *:
+    """
+    Counts bits in a binary representation of a number, or equivalently a subset power
+    """
     cdef int count = 0
     while(int_type):
         int_type &= int_type - 1
@@ -32,6 +35,9 @@ cpdef int bitCount(int int_type) except *:
     return(count)     
 
 def Mobius(np.ndarray[np.float64_t, ndim=1] capacity):
+    """
+    Mobuis transform for a capacity!
+    """
     cdef int v = 0
     cdef int j = 0
     cdef int clen = len(capacity)
@@ -47,6 +53,7 @@ def Mobius(np.ndarray[np.float64_t, ndim=1] capacity):
 def MobiusB(x):
     """
     "Anti-Mobius" for a non-linear case
+    Used for representation of Choquet integral as a product <v, MobB(z)> 
     """
     cdef int i = 0
     cdef int j = 0
@@ -66,6 +73,10 @@ def MobiusB(x):
 
 
 def Choquet_M(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+    """
+    Calculates Choquet wrt a Mobius transform vector
+    Slower than normal, especially if need to calculate Mobius 
+    """
     cdef double C = 0
     cdef int i = 0
     cdef int p = 0
@@ -76,6 +87,10 @@ def Choquet_M(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1
     return C
 
 def Choquet(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+    """
+    Choquet integral calculation.
+    This must be as fast as only possible, since used many times in optimization routines
+    """
     cdef int i = 0
     cdef double C = 0
     cdef int xlen = len(x)
@@ -89,6 +104,10 @@ def Choquet(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] 
 
 
 def Ch_gradient(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+    """
+    Choquet gradient. Calculates permutation and multiplies it by predefined gradients of f(z)
+    Must be very fast, since used many times in optimization routines 
+    """
     cdef int i = 0
     fx = [Fx[i](x[i]) for i in range(len(x))]
     perm = [int(pow(2,i)) for i in np.argsort(fx)]
@@ -101,6 +120,9 @@ def Ch_gradient(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim
     return grad
 
 def Choquet_perm(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+    """ 
+    calculates a permutation vector for a given capacity and point
+    """
     cdef int i = 0
     #fx = [Fx[i](x[i]) for i in range(len(x))]
     perm = [int(pow(2,i)) for i in np.argsort(x)]

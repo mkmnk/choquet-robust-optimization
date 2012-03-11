@@ -14,7 +14,7 @@ from time import time
 import Choquet_toolpack as chq
 from capacity_parameters import *
 cvx.solvers.options['show_progress'] = False
-#import psyco
+import matplotlib.pyplot as plt
 #psyco.full()
 set_printoptions(edgeitems='Inf',linewidth=90)
 #cvx.printing.options['dformat'] = '%.3f'
@@ -22,169 +22,20 @@ cvx.printing.options['width'] = -1
 cvx.solvers.options['LPX_K_MSGLEV'] = 0
 #### Parameters
 maxiter = 10
-GRID=10
-#Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1),(0b01000,0.2)]
-#Shapley = [(0b00001,0.3),(0b00010,0.3),(0b00100,0.1)]
-#Shapley = [(0b00001,0.5),(0b00010,0.3),(0b00100,0.1)]
-#Shapley = [(0b00001,0.2),(0b00010,0.3),(0b00100,0.1)]
-#Shapley = [(0b00001,0.7),(0b00010,0.1)]
-#Shapley = [(0b00001,0.2),(0b00010,0.3)]
-#Shapley = [(0b00100,0.8)]
-#Shapley = [(0b00010,0.4)]
-#Shapley = [(0b00001,0.2)]
-#Shapley = []
-
-# example thesis
-# NODE 4
-#00001 - fw
-#00010 - part
-#00100 - NIDS
-#01000 - IPS
-#10000 - Encr
-#Shapley = {'Sh_values': [(0b00001,0.4)], 
-#           'Sh_order': [(0b00001,0b00010),(0b00010,0b10000),(0b10000,0b00100)], 
-#           'Sh_equal': [(0b00100,0b01000)],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [((0b00001,0b01000),(0b00001,0b00100))],
-#           'ii_positive': [(0b00001,0b00100)], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = []
-## NODE 10
-#Shapley = {'Sh_values': [], 
-#           'Sh_order': [], 
-#           'Sh_equal': [],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [(0b0010,0b1000)], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = [0b0001] 
-#
-#
-## NODE 17
-#Shapley = {'Sh_values': [(0b100,0.45)], 
-#           'Sh_order': [], 
-#           'Sh_equal': [],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = [0b100, 0b010] 
-# NODE 21, 22
-#Shapley = {'Sh_values': [], 
-#           'Sh_order': [(0b10,0b01)], 
-#           'Sh_equal': [],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = [0b10] 
-
-# NODE 23
-#00001 - sec policy
-#00010 - acc cont
-#00100 - user mgmt
-#01000 - pol compl
-#10000 - str auth
-#Shapley = {'Sh_values': [], 
-#           'Sh_order': [(0b00010,0b00100),(0b00001,0b01000),(0b01000,0b10000)], 
-#           'Sh_equal': [(0b00100,0b00001)],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [(0b00100,0b01000)], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = [0b00010]
-
-## NODE 30
-#Shapley = {'Sh_values': [(0b010,0.5)], 
-#           'Sh_order': [(0b010,0b100),(0b100,0b001)], 
-#           'Sh_equal': [],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Shapley = {'Sh_values': [(0b00001,0.4)], 
-#           'Sh_order': [(0b00001,0b00010),(0b00010,0b10000),(0b10000,0b00100)], 
-#           'Sh_equal': [(0b00100,0b01000)],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [((0b00001,0b01000),(0b00001,0b00100))],
-#           'ii_positive': [(0b00001,0b00100)], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = []
-#Necessity = [] 
-
-### NODE 3 Approximated F(B) for 4 and 10
-### 4net 10ser 15phy 16ws
-#Shapley = {'Sh_values': [(0b0010,0.4)], 
-#           'Sh_order': [(0b0001,0b1000),(0b1000,0b0100)], 
-#           'Sh_equal': [(0b0010,0b0001)],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = [0b0001, 0b0010] 
-
-## NODE 22 Approximated F(B) for 23 and NODE 21 Approximated F(B) for 22 and 30
-## 23Acc 29Aud  ## 22TecSt 30HR
-#Shapley = {'Sh_values': [], 
-#           'Sh_order': [(0b01,0b10)], 
-#           'Sh_equal': [],
-#           'Sh_delta': 0.05}
-#
-#Int_index = {'ii_values': [], 
-#           'ii_order': [],
-#           'ii_positive': [], 
-#           'ii_equal': [],
-#           'ii_delta': 0.05}
-#Necessity = [0b01]
-
-# rcap test
-Shapley = {'Sh_values': [(0b001,0.2)], 
-           'Sh_order': [], 
-           'Sh_equal': [],
-           'Sh_delta': 0.05}
-
-Int_index = {'ii_values': [], 
-           'ii_order': [],
-           'ii_positive': [], 
-           'ii_equal': [],
-           'ii_delta': 0.05}
-Necessity = [] 
-
+GRID=21
 
 #####
-#
-######MAIN
-
+#parameters
+####
+from node_config import *
+###
 
 
 def xr_discr(xr, threshold, A, b, Aeq, beq):
-#    print xr
-#    print chq.MobiusB(xr).T
-#    raw_input("Press Enter to continue...")
+    """
+    Input: xr - current point, threshold - value in [Cmin,Cmax] at xr, U = A*v<b,Aeq*v=beq
+    calculates maximal (pointwise) capacity v^max in U, such that (threshold=C(v,xr)). Used for discretization of [Cmin, Cmax] interval
+    """
     Aeq = cvx.sparse([Aeq,chq.MobiusB(xr).T])
     beq = cvx.matrix([beq,threshold])
     zenith = zeros(size(A)[1])
@@ -195,18 +46,25 @@ def xr_discr(xr, threshold, A, b, Aeq, beq):
         zenith[i] = sol['x'][i]
     return zenith
 
+
 def xr_scan(xr, A, b, Aeq, beq):
+    """
+    Input: xr - current point, U = A*v<b,Aeq*v=beq, GRID(global)
+    Calculates Cmin,Cmax and GRID points in between. For each point
+    Calculates v^max and decomposes it, calculates all maxima
+    Output: regret values and points
+    """
+    print "XR",xr
     xr_max = -cvx.solvers.lp(-chq.MobiusB(xr),A,b,Aeq,beq,'glpk')['primal objective']
     xr_min = cvx.solvers.lp(chq.MobiusB(xr),A,b,Aeq,beq,'glpk')['primal objective']
     if xr_min == xr_max:
         xr_range = [xr_min]
     else:
-        xr_range = arange(xr_min,xr_max,(xr_max-xr_min)/GRID)
+        xr_range =linspace(xr_min,xr_max,GRID)
     Ub = []
     for x in xr_range:
         cap = xr_discr(xr, x, A, b, Aeq, beq)
         mcap = chq.Mobius(cap)
-#        mcap = array([ 0. ,  0.6,  0.6,  0.6, -0.3, -0.3, -0.3,  0.1])
         if nonzero(mcap<0)[0].any():
             """ Overcutting
             c = array([chq.max_choquet(p) for p in chq.cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((chq.dim,chq.dim),dtype=int),result = [])]).round(2)
@@ -225,7 +83,14 @@ def xr_scan(xr, A, b, Aeq, beq):
             Ub.append(upbound)     
     return Ub,xr_min,xr_max
 
+
+
 def caps_mm(xub_arr,xr,A,b,Aeq,beq,R):
+    """
+    Input: upper bound array, current point xr, U=A*v<b,Aeq*v=beq, current regret R
+    Calc max regret over U at point from xubb_arr
+    Output: unique capacities which produce regret > R at points p from xub_arr
+    """
     print "IN CAPS_MM"
     t0 = time()
     print len(xub_arr)
@@ -239,12 +104,20 @@ def caps_mm(xub_arr,xr,A,b,Aeq,beq,R):
     print "CAPS_MM", time()-t0
     return c
             
+
+
 def main():
+    """
+    Input:none
+    Generate U=A*v<b,Aeq*v<beq
+    do a Cmin to Cmax scan at xr, find upper bound candidate points
+    find capacities which exceed upper bound in these points, add to Umm
+    solve mmax for Umm
+    Output: solution, regrets for all v in Umm, plot
+    """
     t0 = time()
-    A,b = gen_inequalities(chq.dim,Shapley,Int_index)
+    A,b = gen_inequalities(chq.dim,Shapley,Int_index,convex=1)
     Aeq,beq = gen_equalities(chq.dim,Shapley['Sh_values'],Int_index,Necessity)
-#    print A, Aeq
-#    raw_input("123")
     xr = [1./chq.dim for i in range(chq.dim)]
     R = 0
     Umm = []
@@ -259,9 +132,6 @@ def main():
             print "distance", R
             print "active caps", Umm
             break
-    #    print "XUB",xub_arr
-    #    print "CAPS_MM"
-    #    print caps_mm(xub_arr,xr,A,b,Aeq,beq)
         "UMM EXTEND"
         umm_bef = len(Umm)
         Umm.extend([[chq.max_choquet(p),p] for p in caps_mm(xub_arr,xr,A,b,Aeq,beq,R) if tuple(p) not in [tuple(q[1]) for q in Umm]])
@@ -277,22 +147,18 @@ def main():
         xr,R = chq.solve_mmax(Umm)
     print "solution", xr
     print "distance", R
-#    print "active caps", Umm
-#    print max([p[2] for p in Ub])
-#    print [p[1] for p in Ub if p[2]>R]
+    print "active distance"
+    for i in [(p[1], chq.Choquet(array(p[0]),p[1]) - chq.Choquet(array(xr),p[1])) for p in Umm]:
+        print i
     gap = max([p[2] for p in Ub]) - R
+    gap_arr =  [p for p in Ub if p[2] >= R]
     print "Final and GAP", i, xr,R,gap,gap/R*100
-    print "Time", time()-t0 
-    return array(xr)
-#    x = arange(0,1.0,0.01)
-#    z = [[(-cvx.solvers.lp(chq.MobiusB(xr)-chq.MobiusB([p,q,1-p-q]),A,b,Aeq,beq,'glpk')['primal objective'],[p,q,1-p-q]) for q in x if p+q <= 1] for p in x]
-#    print "LALALALA", max([p for p in chain(*z)])
-#    [p for p in chain(*z) if p[0] >= R-0.005]
-#    print z
-#    print min(z)
-#    plt.hlines(R,xr_min,xr_max)
-#    plt.plot([p[3] for p in Ub],[p[2] for p in Ub],'bo')
-#    plt.show()
+    print "Time", time()-t0
+    plt.hlines(R,xr_min,xr_max)
+    plt.plot([p[3] for p in Ub],[p[2] for p in Ub],'bo')
+    plt.show() 
+    return array(xr),Ub
+
 
 def checker():
     A,b = gen_inequalities(chq.dim)
@@ -306,13 +172,8 @@ def checker():
         if z >= 0.16:
             print z
 
-xr = main()
+xr,Ub = main()
 
 
-#import matplotlib.pyplot as plt
-#checker()
-
-
-
-
+ 
 

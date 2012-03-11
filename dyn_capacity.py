@@ -4,49 +4,50 @@ Dynamic robust capacity identification functions
 """
 
 import read_config
+import sys
 import capacity_parameters
 
 
-def robust_id(config,node,Z):
+def robust_id(config,node):
     """
-    
+    Robust identification by solving dual
+    inputs: config file name, node number.
+    it is assumed that all subnodes have functions
     """
-    node_params = read_config.parse_node_config(config,node)    
-    f={}
-    for subnode in node_params['subnodes']:
-        f['subnode'] = read_config.parse_node_config(config,subnode)['function']
-    Shapley = dict((k,v) for k,v in node_params.iteritems() if k in ['Sh_order','Sh_equal'])
-    Shapley['Sh_values'] = []             # need to redo this, next line, and ii 2 lines below TBC1
-    Shapley['Sh_delta'] = 0.05            # FIXME
-    Int_index = dict((k,v) for k,v in node_params.iteritems() if k in ['ii_order','ii_positive','ii_negative','ii_equal'])
-    Int_index['ii_values'] = []           # FIXME
-    Int_index['ii_delta'] = 0.00          # FIXME
-    Necessity = node_params['necessity']
+    node_params = read_config.parse_node_config(config,node)
+    node_params['criteria_functions'] = {}   # subnode functions called "criteria functions" for passing to capacity_parameters methods
+    for subnode in node_params['subnodes']: 
+        try:
+            node_params['criteria_functions'][subnode] = read_config.parse_node_config(config,subnode)['function']
+        except:
+            print "Not all subnodes have functions! ",subnode
+            sys.exit(1)            
+    node_params = read_config.relabel(node_params)      # relabel DM information to 1,2,... so that it can be passed to capacity_parameters methods
+    A,b = capacity_parameters.gen_inequalities(node_params,convex=0)
+    Aeq,beq = capacity_parameters.gen_equalities(node_params,k_additive=2)
 
-    A,b = capacity_parameters.gen_inequalities(chq.dim,Shapley,Int_index,convex=1)
-    Aeq,beq = capacity_parameters.gen_equalities(chq.dim,Shapley['Sh_values'],Int_index,Necessity,suff,k_additive=2)
-    cap_list = []
-    for Zi in linspace(0,Z):
-        cap_list.append((Zi,solve_dual(A,b,Aeq,beq,f,Zi)))
-    vr = linear_intepolation(cap_list)
+    # cap_list = []
+    # for Zi in linspace(0,Z):
+    #     cap_list.append((Zi,solve_dual(A,b,Aeq,beq,f,Zi)))
+    # vr = linear_nitepolation(cap_list)
     
-    # Convert A,b,Aeq,beq to Ax<=b form, reduce to 2add and calculate vertices
-    #
-    A = matrix(cvx.matrix([A,Aeq,-Aeq]))
-    b = matrix(cvx.matrix([b,beq,-beq]))
-    A = matrix(cvx.matrix([A]))
-    b = matrix(cvx.matrix([b,beq,-beq]))
-	# Convert to 2-additive for vertex search simplification
-	#
-    A, b, bas = convert2kadd(A,b)
-    bas.insert(0,0)
-    p = Hrep(A, b)
-    Vm = array(p.generators)
-    # print Vm
-    Vm = convertnadd(Vm,bas)
-    #
-    # Split vertices into convex and nonconvex and call find_cap for each permutation
-    #
+    # # Convert A,b,Aeq,beq to Ax<=b form, reduce to 2add and calculate vertices
+    # #
+    # A = matrix(cvx.matrix([A,Aeq,-Aeq]))
+    # b = matrix(cvx.matrix([b,beq,-beq]))
+    # A = matrix(cvx.matrix([A]))
+    # b = matrix(cvx.matrix([b,beq,-beq]))
+	# # Convert to 2-additive for vertex search simplification
+	# #
+    # A, b, bas = convert2kadd(A,b)
+    # bas.insert(0,0)
+    # p = Hrep(A, b)
+    # Vm = array(p.generators)
+    # # print Vm
+    # Vm = convertnadd(Vm,bas)
+    # #
+    # # Split vertices into convex and nonconvex and call find_cap for each permutation
+    # #
 
 
 def capacity_id(config,node,id_mode):
@@ -60,7 +61,7 @@ def capacity_id(config,node,id_mode):
         if not read_config.parse_node_config(config,subnode)['function']:
             if 'subnodes' not in read_config.parse_node_config(config,subnode):
                 print "Node ",node," is not an aggregation node and does not have a function defined - check config!"
-                exit(1)
+                sys.exit(1)
             else:
                 capacity_id(config,subnode,id_mode)   # recursive call
     if id_mode == 'r':                            # all subnodes have functions
@@ -110,5 +111,6 @@ def main():
         print "Input not recognized"
         main()
 
-main()
+robust_id('example_node.cfg','20')
+        # main()
     
