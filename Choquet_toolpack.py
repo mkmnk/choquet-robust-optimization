@@ -25,7 +25,7 @@ from capacity_parameters import *
 #cvx.solvers.options['LPX_K_MSGLEV'] = 0
 ### Constants
 dim = 4
-Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-x)]
+#Fx = [lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-x)]
 #Fx = [lambda x: -0.029335929406647*pow(x,6) + 0.207346406139707*pow(x,5) - 0.579333438490725*pow(x,4) + 0.821527980327791*pow(x,3) - 0.698397454788673*pow(x,2)  + 0.687228652793793*x, lambda x: -0.027728205126421*pow(x,6) + 0.197460701672059*pow(x,5) - 0.567139344258168*pow(x,4) + 0.888084577320966*pow(x,3) - 1.002827533837975*pow(x,2)  + 1.152014732068982*x,lambda x: 1-exp(-3*x), lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x),lambda x: 1-exp(-3*x)]
 #dFx = [lambda x: -0.029335929406647*6*pow(x,5) + 0.207346406139707*5*pow(x,4) - 0.579333438490725*4*pow(x,3) + 0.821527980327791*3*pow(x,2) - 0.698397454788673*2*x  + 0.687228652793793, lambda x: -0.027728205126421*6*pow(x,5) + 0.197460701672059*5*pow(x,4) - 0.567139344258168*4*pow(x,3) + 0.888084577320966*3*pow(x,2) - 1.002827533837975*2*x  + 1.152014732068982, lambda x: 3*exp(-3*x), lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x),lambda x: 3*exp(-3*x)]
 #######
@@ -85,24 +85,24 @@ def find_centre():
     val_centre = Choquet(centre,capacity)
     return centre, val_centre
 
-def cap_dnf_t(cap,S,cmatr = zeros((dim,dim)),result = []):
+def cap_dnf_t(cap,S,cmatr,result = []):
     """
     Finds the point f_1 = ... = f_n by optimizing a capacity having v(A)=0,forall A \neq N
     """
     print "IN CAPDNF"
     t0 = time()
-    result = cap_dnf(cap,S,cmatr = zeros((dim,dim),dtype=int),result = [])
+    result = cap_dnf(cap,S,cmatr,result = [])
     print "TIME CAP_DNF", time()-t0
     print shape(result)
-    return result
+    return around(result,11)
 
 #Budg = 1
 
-def max_choquet(capacity,Budg = 1):
+def max_choquet(capacity,fx,dfx,Budg = 1):
     """
-    Calculates the integral maximum
+    Calculates the integral maximum over a simplex sum(x_i) = Budg
     """
-    x0 = zeros(dim+1)
+    x0 = zeros(len(fx)+1)
     def f_eqcons(x):
         Aeq = ones(len(x)-1)
         beq = Budg
@@ -112,13 +112,13 @@ def max_choquet(capacity,Budg = 1):
         return append(0,ones(len(x)-1))
 
     def f_ineqcons(x,capacity):
-        A = append(Choquet(x[1:],capacity)-x[0], x)
+        A = append(Choquet(x[1:],capacity,fx)-x[0], x)
         A = append(A,Budg-x)
         return A
         
 
     def fprime_ineqcons(x,capacity):
-        A = append(-1,Ch_gradient(x[1:], capacity))
+        A = append(-1,Ch_gradient(x[1:], capacity,fx,dfx))
         B = diag(ones(len(x)))        
         C = -diag(ones(len(x)))
         D = vstack((A,B,C))
@@ -134,7 +134,7 @@ def max_choquet(capacity,Budg = 1):
     fprime_ineqcons_w = lambda x: fprime_ineqcons(x,capacity)
 #    t0 = time()
 #    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,iprint=2,full_output=1)
-    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-11,iter=300)
+    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-5,iter=300)
     return sol[0][1:]
     
 def solve_mmax(Umm,Budg = 1):
@@ -339,13 +339,14 @@ def max_dual(cap_array,Budg = 1):
     return sol[0][1:]
 
 
-def max_choquet_glob(capacity):
+def max_choquet_glob(capacity,fx,dfx,Budg):
     """
     Calculates the global maximum of Choq. w.r.t any capacity by decomposing into convex parts
     """
     mcap = Mobius(capacity)
-    sols = [[max_choquet(p),p] for p in cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((dim,dim),dtype=int),result = [])]
-    s1 = [[Choquet(array(p[0]),p[1]),p[0]] for p in sols]
+    print capacity
+    sols = [[max_choquet(p,fx,dfx,Budg),p] for p in cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((len(fx),len(fx)),dtype=int),result = [])]
+    s1 = [[Choquet(array(p[0]),p[1],fx),p[0]] for p in sols]
     return max(s1, key=operator.itemgetter(0))[1]
     
 def solve_mmax_wval(Umm,Budg = 1):
@@ -390,7 +391,7 @@ def solve_mmax_wval(Umm,Budg = 1):
     return sol[0][1:],sol[1]
 
 
-def solve_dual(cap_array,gm):
+def solve_dual(cap_array,fx,dfx,gm):
     """
     Input: array of tuples (capacity (e.g. vertices of U) or its nec.measure component, global maximum)
     Finds the robust capacity, i.e. the solution of dual problem
@@ -409,15 +410,15 @@ def solve_dual(cap_array,gm):
     
     def fprime(x,cap_array,Budg):
         cap_int = dot(cap_array.T,x)
-        x_int = array(max_choquet(cap_int,Budg))
-        ch_xr = array([Choquet(x_int,v) for v in cap_array])
+        x_int = array(max_choquet(cap_int,fx,dfx,Budg))
+        ch_xr = array([Choquet(x_int,v,fx) for v in cap_array])
         ch_diffs = ch_xr - vmax
         return ch_diffs
 
     def objfunc(x,cap_array,Budg):
         cap_int = dot(cap_array.T,x)
-        x_int = array(max_choquet(cap_int,Budg))
-        ch_xr = array([Choquet(x_int,v) for v in cap_array])
+        x_int = array(max_choquet(cap_int,fx,dfx,Budg))
+        ch_xr = array([Choquet(x_int,v,fx) for v in cap_array])
         ch_diffs = ch_xr - vmax
 #        print  dot(x, ch_diffs)
         return dot(x, ch_diffs)
