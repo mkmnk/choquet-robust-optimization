@@ -1,5 +1,4 @@
 import sys
-import pdb
 from numpy import *
 from scipy import *
 from scipy import sparse
@@ -18,11 +17,11 @@ sys.path.append('/home/gb/Downloads/science/algencan-2.3.7/bin/py')
 #from enthought.mayavi.mlab import *
 
 set_printoptions(edgeitems='Inf',linewidth=200,suppress=True)
-cvx.printing.options['width'] = -1
-cvx.solvers.options['LPX_K_MSGLEV'] = 0
+# cvx.printing.options['width'] = -1
+# cvx.solvers.options['LPX_K_MSGLEV'] = 0
 
-n = 2**chq.dim
-v = zeros(n)
+# n = 2**chq.dim
+# v = zeros(n)
 
 #from node_config import *
 # Vx = [(chq.max_choquet(p),p) for p in Vm]
@@ -102,6 +101,7 @@ def nc_primal(Vm):
         sol.extend([chq.max_choquet(rcap),rcap, perm])
         sols.append(sol)
     return sols
+    
 
 def convert2kadd(A,b,k=2):
     """
@@ -176,16 +176,16 @@ def nec_measure(capacity,perm,Z):
     return dot(necmeas,Z)
 
 
-def nc_dual(Vm,f,Z):
+def nc_dual(Vm,dm_info,Budg):
     """
     dual solving for nonconvex capacities
     actually a wrapper around solve_dual (calls it for each permutation)
     """
     sols = []
-    n = int(log2(shape(Vm)[1]))
-    Ac = convexity(int(pow(2,n)))
+    dim = len(dm_info['criteria_functions'])
+    Ac = convexity(int(pow(2,dim)))
     Ac = matrix(cvx.matrix(Ac))
-    base = [int(pow(2,i)) for i in range(n)]
+    base = [int(pow(2,i)) for i in range(dim)]
     Vm_conv = []
     Vm_nonconv = []
     for i in range(shape(Vm)[0]):                                          # test for 2-monotonicity, separate into 2 arrays
@@ -195,21 +195,116 @@ def nc_dual(Vm,f,Z):
             Vm_conv.append(Vm[i,:])
     Vm_conv=array(Vm_conv)
     Vm_nonconv=array(Vm_nonconv)
-    Uc_conv = [[chq.Choquet(array(chq.max_choquet(p)),p),p] for p in Vm_conv]
-    Uc_nonconv = [[chq.Choquet(array(chq.max_choquet_glob(p)),p),p] for p in Vm_nonconv]
-    Z = zeta_matrix(int(pow(2,n)))
-    for perm in permutations(base):
-        print perm
-        Uc_necmeas = [[p[0],nec_measure(p[1],perm,Z)] for p in Uc_nonconv]
-        Uc_necmeas.extend(Uc_conv)
-        Gmax = array([i[0] for i in Uc_necmeas])
-        Vconv = array([i[1] for i in Uc_necmeas])
-        obj_d,rcap = Choquet_toolpack.solve_dual(Vconv,Gmax)
-        sols.append((obj_d,rcap))
-	sols.sorted(key=operator.itemgetter(0))
-	print sols
-	vr = sols[0]
-    return vr
+    print "NONCONVEX VERTICES"
+    print "***********************************************"
+    print Vm_nonconv
+    print "CONVEX VERTICES"
+    print "***********************************************"
+    print Vm_conv
+    fx = dm_info['criteria_functions'].values()
+    dfx = dm_info['criteria_fgrad'].values()
+    Uc_conv = [[chq.Choquet(array(chq.max_choquet(p,fx,dfx,Budg)),p,fx),p] for p in Vm_conv] 
+    print "Choquet integral VALUES for convex caps"
+    print "***********************************************"
+    print Uc_conv
+    Uc_nonconv = [[chq.Choquet(array(chq.max_choquet_glob(p,fx,dfx,Budg)),p,fx),p] for p in Vm_nonconv] # [(glob_max,capacity)]
+    print "Choquet integral VALUES for nonconvex caps"
+    print "***********************************************"
+    print Uc_nonconv
+    Z = zeta_matrix(int(pow(2,dim)))
+    # SIP part (capacity filter)
+    Uc_c = []
+    Uc_nc = []
+    zr = Choquet_toolpack.find_centre(fx,dfx)[0]   # initial parameters, might be changed
+    t = 0 
+    while 1:
+        if t == 0:                            # kickstart: assume a large t and go down until there are capacities for which the diff exceeds it
+            t = 0.4
+            cl_c = []
+            cl_nc = []
+            while not (cl_c or cl_nc):
+                cl_c = sip_filter(Uc_conv,zr,fx,t)
+                cl_nc = sip_filter(Uc_nonconv,zr,fx,t)
+                t = t - 0.05
+        else:
+            cl_c = sip_filter(Uc_conv,zr,fx,t)
+            cl_nc = sip_filter(Uc_nonconv,zr,fx,t)
+        print "Threshold: ",t    
+        print "Filtered: convex: ", len(cl_c), " Nonconvex: ", len(cl_nc)
+        if (cl_c or cl_nc):
+            Uc_c.extend(cl_c)
+            Uc_nc.extend(cl_nc)
+            for perm in permutations(base):     # nonconvexity part (permutations)
+                print perm
+                Uc_necmeas = [[p[0],nec_measure(p[1],perm,Z)] for p in Uc_nc]
+                Uc_necmeas.extend(Uc_c)
+                Gmax = array([i[0] for i in Uc_necmeas])
+                Vconv = array([i[1] for i in Uc_necmeas])
+                vr,obj_d,d_mix = Choquet_toolpack.solve_dual_sip(Uc_necmeas,fx,dfx,Budg)
+                sols.append((obj_d,vr))
+                # sols.append((obj_p,xr))
+            sols.sort(key=operator.itemgetter(0),reverse=True)
+            print sols
+            zr = array(Choquet_toolpack.max_choquet(sols[0][1],fx,dfx,Budg))
+        RSol_D = sols[0][1]
+        OBJ_D = sols[0][0]
+        break 
+    Uc_c = []
+    Uc_nc = []
+    zr = Choquet_toolpack.find_centre(fx,dfx)[0]   # initial parameters, might be changed
+    t = 0 
+    sols = []
+    while 1:                          # Now solve primal
+        if t == 0:                            # kickstart: assume a large t and go down until there are capacities for which the diff exceeds it
+            t = 0.4
+            cl_c = []
+            cl_nc = []
+            while not (cl_c or cl_nc):
+                cl_c = sip_filter(Uc_conv,zr,fx,t)
+                cl_nc = sip_filter(Uc_nonconv,zr,fx,t)
+                t = t - 0.05
+        else:
+            cl_c = sip_filter(Uc_conv,zr,fx,t)
+            cl_nc = sip_filter(Uc_nonconv,zr,fx,t)
+        print "Threshold: ",t    
+        print "Filtered: convex: ", len(cl_c), " Nonconvex: ", len(cl_nc)
+        if (cl_c or cl_nc):
+            Uc_c.extend(cl_c)
+            Uc_nc.extend(cl_nc)
+            print 123
+            for perm in permutations(base):     # nonconvexity part (permutations)
+                print perm
+                Uc_necmeas = [[p[0],nec_measure(p[1],perm,Z)] for p in Uc_nc]
+                Uc_necmeas.extend(Uc_c)
+                Gmax = array([i[0] for i in Uc_necmeas])
+                Vconv = array([i[1] for i in Uc_necmeas])
+                xr,obj_p = Choquet_toolpack.solve_mmax_wval(Uc_necmeas,fx,dfx,Budg)
+                sols.append((obj_p,xr))
+            sols.sort(key=operator.itemgetter(0),reverse=True)
+            print sols
+        RSol_P = sols[0][1]
+        OBJ_P = sols[0][0]
+        break 
+    print "FOUND SOLUTION"
+    print "dual robust point: ", RSol_D
+    print "dual objective value: ", OBJ_D
+    print "primal robust point: ", RSol_P
+    print "primal objective value: ", OBJ_P
+    return sols[0][1]
+
+
+def sip_filter(cap_list,zr,fx,t):
+    """
+    Goes through the vertices and picks v_i such that max_z C(v_i,f(z)) - C(v_i,f(z^r)) > t
+    If t = 0 (on first iteration) returns top 3 capacities from both lists
+    Input: Uc_conv,Uc_nonconv - lists of pairs (max_val, capacity), zr - point to check, fx - functions, t - threshold
+    Output: two lists of capacities filtered according to the rules above
+    """
+
+    c = [x[1] for x in [(i[0] - Choquet_toolpack.Choquet(zr,i[1],fx)-t,i) for i in cap_list] if x[0]>0] # strict inequalities!
+
+    return c
+
     
 # A, b, bas = convert2kadd(A,b)
 # bas.insert(0,0)

@@ -86,16 +86,31 @@ def Choquet_M(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1
         C += m[i]*min([Fx[p](x[p]) for p in f_set])
     return C
 
-def Choquet(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+# def Choquet(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+#     """
+#     Choquet integral calculation.
+#     This must be as fast as only possible, since used many times in optimization routines
+#     """
+#     cdef int i = 0
+#     cdef double C = 0
+#     cdef int xlen = len(x)
+# #cap = list(capacity)
+#     fx = [Fx[i](x[i]) for i in range(xlen)]
+#     pp = argsort(fx)
+#     perm = [int(pow(2,i)) for i in pp]
+#     for i in range(xlen):
+#       C += fx[pp[i]]*(capacity[sum(perm[i:])]-capacity[sum(perm[i+1:])])
+#     return C
+
+def Choquet(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity, Gx):
     """
-    Choquet integral calculation.
-    This must be as fast as only possible, since used many times in optimization routines
+    Choquet integral calculation with functions as arguments
     """
     cdef int i = 0
     cdef double C = 0
     cdef int xlen = len(x)
 #cap = list(capacity)
-    fx = [Fx[i](x[i]) for i in range(xlen)]
+    fx = [Gx[i](x[i]) for i in range(xlen)]
     pp = argsort(fx)
     perm = [int(pow(2,i)) for i in pp]
     for i in range(xlen):
@@ -103,18 +118,34 @@ def Choquet(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] 
     return C
 
 
-def Ch_gradient(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+# def Ch_gradient(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity):
+#     """
+#     Choquet gradient. Calculates permutation and multiplies it by predefined gradients of f(z)
+#     Must be very fast, since used many times in optimization routines 
+#     """
+#     cdef int i = 0
+#     fx = [Fx[i](x[i]) for i in range(len(x))]
+#     perm = [int(pow(2,i)) for i in np.argsort(fx)]
+#     p = []
+#     for i in range(len(perm)): 
+#         p.extend([capacity[sum(perm[i:])]-capacity[sum(perm[i+1:])]])
+#     dfx = [dFx[i](x[i]) for i in argsort(fx)]
+#     grad_sort = [p[i]*dfx[i] for i in range(len(dfx))]
+#     grad = [grad_sort[i] for i in argsort(perm)]
+#     return grad
+
+def Ch_gradient(np.ndarray[np.float64_t, ndim=1] x,np.ndarray[np.float64_t, ndim=1] capacity,Gx,dGx):
     """
-    Choquet gradient. Calculates permutation and multiplies it by predefined gradients of f(z)
+    Choquet gradient. Calculates permutation and multiplies it by predefined gradients dGx
     Must be very fast, since used many times in optimization routines 
     """
     cdef int i = 0
-    fx = [Fx[i](x[i]) for i in range(len(x))]
+    fx = [Gx[i](x[i]) for i in range(len(x))]
     perm = [int(pow(2,i)) for i in np.argsort(fx)]
     p = []
     for i in range(len(perm)): 
         p.extend([capacity[sum(perm[i:])]-capacity[sum(perm[i+1:])]])
-    dfx = [dFx[i](x[i]) for i in argsort(fx)]
+    dfx = [dGx[i](x[i]) for i in argsort(fx)]
     grad_sort = [p[i]*dfx[i] for i in range(len(dfx))]
     grad = [grad_sort[i] for i in argsort(perm)]
     return grad
