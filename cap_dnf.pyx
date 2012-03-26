@@ -116,10 +116,10 @@ def cap_dnf(np.ndarray[np.float64_t, ndim=1] cap, int S,np.ndarray[np.int_t, ndi
             newin = sum([pow(2,p) for p in new_el])
             if newin != i:
                 capnew[newin] = (capnew[newin] + cap[i])
-                if (capnew[newin] > -0.000001) and (capnew[newin] < 0.000001):
+                if (capnew[newin] > -0.0000001) and (capnew[newin] < 0.0000001):
                     capnew[newin]=0.0
                 capnew[i] = 0.0
-        if np.nonzero(capnew < -0.000001)[0].any():
+        if np.nonzero(capnew < -0.0000001)[0].any():
             capnew = cap_dnf(capnew, np.nonzero(capnew < 0)[0][0], A,result)
         else: 
             result.append(to_bel(zeta(capnew),A))

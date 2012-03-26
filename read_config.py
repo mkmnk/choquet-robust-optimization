@@ -68,6 +68,9 @@ def parse_node_config(filename,node):
     if config.has_option(node,'function'):
         f_str = config.get(node,'function')
         node_params['function'] = eval("lambda x:" + f_str, math.__dict__)
+    if config.has_option(node,'fgrad'):
+        f_str = config.get(node,'fgrad')
+        node_params['fgrad'] = eval("lambda x:" + f_str, math.__dict__)    
     if config.has_option(node,'subnodes'):
         node_params['subnodes'] = [int(i) for i in config.get(node,'subnodes').split(',')]
     return node_params
@@ -96,10 +99,10 @@ def relabel(node_params):
     sbnode_map = list(enumerate(sorted(node_params['subnodes']),start=1)) # creates a list of pairs (index,element), which acts as (to,from)
     # sbnode_map_binary = [(bin(i),bin(j)) for i,j in sbnode_map]   # and its binary representation
     for i in node_params:
-        if i not in ['function','criteria_functions','Sh_delta']:
+        if i not in ['function','fgrad','criteria_functions','criteria_fgrad','Sh_delta','ii_delta']:
             for smap in sbnode_map:
                 node_params[i] = eval(repr(node_params[i]).replace(str(smap[1]),str(smap[0])))
-        elif i == 'criteria_functions':
+        elif i in ['criteria_functions','criteria_fgrad']:
             node_params[i]=dict((t,node_params[i][f]) for t,f in sbnode_map)
     return node_params
 
