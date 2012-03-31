@@ -175,14 +175,23 @@ def nec_measure(capacity,perm,Z):
         necmeas[el] = capacity[el] - capacity[elprev]
     return dot(necmeas,Z)
 
+def gen_constraints(dm_info):
+    dim = len(dm_info['criteria_functions'])
+    AZ = r_[diag(ones(dim)),diag(-ones(dim))]
+    bZ = r_[array([v for k,v in dm_info['limits'].items() if k != 'total']),zeros(dim)]
+    AeqZ = array([ones(dim)])
+    beqZ = array(dm_info['limits']['total'])
+    return AZ,bZ,AeqZ,beqZ
 
-def nc_dual(Vm,dm_info,Budg):
+
+def nc_dual(Vm,dm_info):
     """
     dual solving for nonconvex capacities
     actually a wrapper around solve_dual (calls it for each permutation)
     """
     sols = []
     dim = len(dm_info['criteria_functions'])
+    AZ,bZ,AeqZ,beqZ = gen_constraints(dm_info)
     Ac = convexity(int(pow(2,dim)))
     Ac = matrix(cvx.matrix(Ac))
     base = [int(pow(2,i)) for i in range(dim)]
@@ -203,11 +212,11 @@ def nc_dual(Vm,dm_info,Budg):
     print Vm_conv
     fx = dm_info['criteria_functions'].values()
     dfx = dm_info['criteria_fgrad'].values()
-    Uc_conv = [[chq.Choquet(array(chq.max_choquet(p,fx,dfx,Budg)),p,fx),p] for p in Vm_conv] 
+    Uc_conv = [[chq.Choquet(array(chq.max_choquet(p,fx,dfx,AZ,bZ,AeqZ,beqZ)),p,fx),p] for p in Vm_conv] 
     print "Choquet integral VALUES for convex caps"
     print "***********************************************"
     print Uc_conv
-    Uc_nonconv = [[chq.Choquet(array(chq.max_choquet_glob(p,fx,dfx,Budg)),p,fx),p] for p in Vm_nonconv] # [(glob_max,capacity)]
+    Uc_nonconv = [[chq.Choquet(array(chq.max_choquet_glob(p,fx,dfx,AZ,bZ,AeqZ,beqZ)),p,fx),p] for p in Vm_nonconv] # [(glob_max,capacity)]
     print "Choquet integral VALUES for nonconvex caps"
     print "***********************************************"
     print Uc_nonconv
@@ -215,7 +224,7 @@ def nc_dual(Vm,dm_info,Budg):
     # SIP part (capacity filter)
     Uc_c = []
     Uc_nc = []
-    zr = Choquet_toolpack.find_centre(fx,dfx)[0]   # initial parameters, might be changed
+    zr = Choquet_toolpack.find_centre(fx,dfx,AZ,bZ,AeqZ,beqZ)[0]   # initial parameters, might be changed
     t = 0 
     while 1:
         if t == 0:                            # kickstart: assume a large t and go down until there are capacities for which the diff exceeds it
@@ -240,18 +249,17 @@ def nc_dual(Vm,dm_info,Budg):
                 Uc_necmeas.extend(Uc_c)
                 Gmax = array([i[0] for i in Uc_necmeas])
                 Vconv = array([i[1] for i in Uc_necmeas])
-                vr,obj_d,d_mix = Choquet_toolpack.solve_dual_sip(Uc_necmeas,fx,dfx,Budg)
-                sols.append((obj_d,vr))
+                vr,obj_d,d_sol = Choquet_toolpack.solve_dual_sip_lp(Uc_necmeas,fx,dfx,AZ,bZ,AeqZ,beqZ)
+                sols.append((obj_d,vr,d_sol))
                 # sols.append((obj_p,xr))
-            sols.sort(key=operator.itemgetter(0),reverse=True)
+            sols.sort(key=operator.itemgetter(0),reverse=True)   # largest obj value first
             print sols
-            zr = array(Choquet_toolpack.max_choquet(sols[0][1],fx,dfx,Budg))
-        RSol_D = sols[0][1]
-        OBJ_D = sols[0][0]
+            # zr = array(Choquet_toolpack.max_choquet(sols[0][1],fx,dfx,AZ,bZ,AeqZ,beqZ))
+        SOL_D = sols[0]
         break 
     Uc_c = []
     Uc_nc = []
-    zr = Choquet_toolpack.find_centre(fx,dfx)[0]   # initial parameters, might be changed
+    zr = Choquet_toolpack.find_centre(fx,dfx,AZ,bZ,AeqZ,beqZ)[0]   # initial parameters, might be changed
     t = 0 
     sols = []
     while 1:                          # Now solve primal
@@ -278,19 +286,16 @@ def nc_dual(Vm,dm_info,Budg):
                 Uc_necmeas.extend(Uc_c)
                 Gmax = array([i[0] for i in Uc_necmeas])
                 Vconv = array([i[1] for i in Uc_necmeas])
-                xr,obj_p = Choquet_toolpack.solve_mmax_wval(Uc_necmeas,fx,dfx,Budg)
+                xr,obj_p = Choquet_toolpack.solve_mmax_wval(Uc_necmeas,fx,dfx,AZ,bZ,AeqZ,beqZ)
                 sols.append((obj_p,xr))
-            sols.sort(key=operator.itemgetter(0),reverse=True)
+            sols.sort(key=operator.itemgetter(0),reverse=True)   # largest obj Value first
             print sols
-        RSol_P = sols[0][1]
-        OBJ_P = sols[0][0]
+        SOL_P = sols[0]
         break 
     print "FOUND SOLUTION"
-    print "dual robust point: ", RSol_D
-    print "dual objective value: ", OBJ_D
-    print "primal robust point: ", RSol_P
-    print "primal objective value: ", OBJ_P
-    return sols[0][1]
+    print "dual solution: ", SOL_D
+    print "primal solution: ", SOL_P
+    return chq.Choquet(SOL_D[2],SOL_D[1],fx)
 
 
 def sip_filter(cap_list,zr,fx,t):
