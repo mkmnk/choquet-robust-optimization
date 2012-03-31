@@ -75,13 +75,13 @@ def MobiusC(x):
                 f[v] += power(-1,bitCount(j) - bitCount(v))*min([x[p] for p in f_set])
     return cvx.matrix(f)
 
-def find_centre(fx,dfx):
+def find_centre(fx,dfx,AZ,bZ,AeqZ,beqZ):
     """
     Finds the point f_1 = ... = f_n by optimizing a capacity having v(A)=0,forall A \neq N
     """
     capacity = zeros(2**dim)
     capacity[-1] = 1
-    centre = max_choquet(capacity,fx,dfx)
+    centre = max_choquet(capacity,fx,dfx,AZ,bZ,AeqZ,beqZ)
     val_centre = Choquet(array(centre),capacity,fx)
     return array(centre), val_centre
 
@@ -98,30 +98,32 @@ def cap_dnf_t(cap,S,cmatr,result = []):
 
 #Budg = 1
 
-def max_choquet(capacity,fx,dfx,Budg):
+def max_choquet(capacity,fx,dfx,AZ,bZ,AeqZ,beqZ):
     """
-    Calculates the integral maximum over a simplex sum(x_i) = Budg
+    Calculates the integral maximum over a set Ax<=b , Aeqx = beq
+    AZ,bZ,AeqZ,beqZ - numpy arrays!
+    AZ, AeqZ  - n x m_i  (e.g. array([[1,1,1,1,1]]))
+    bZ,beqZ - 1 x n (e.g. array([1,2,3,4]))
     """
     x0 = zeros(len(fx)+1)
     def f_eqcons(x):
-        Aeq = ones(len(x)-1)
-        beq = Budg
-        return array([dot(Aeq,x[1:])-beq])
+        # Aeq = ones(len(x)-1)
+        # beq = Budg
+        return dot(AeqZ,x[1:])-beqZ
 
     def fprime_eqcons(x):
-        return append(0,ones(len(x)-1))
+        return insert(AeqZ,0,zeros(shape(AeqZ)[0]),1)
 
     def f_ineqcons(x,capacity):
-        A = append(Choquet(x[1:],capacity,fx)-x[0], x)
-        A = append(A,Budg-x)
-        return A
+        return append(Choquet(x[1:],capacity,fx)-x[0], bZ-dot(AZ,x[1:]))   # C(v,x[1:])>=t,  x[1:]>=0
+        # A = append(A,Budg-x)              # x[1:]<=Budg 
+        # return A
         
 
     def fprime_ineqcons(x,capacity):
-        A = append(-1,Ch_gradient(x[1:], capacity,fx,dfx))
-        B = diag(ones(len(x)))        
-        C = -diag(ones(len(x)))
-        D = vstack((A,B,C))
+        FP1 = append(-1,Ch_gradient(x[1:], capacity,fx,dfx))
+        FP2 = insert(-AZ,0,zeros(shape(AZ)[0]),1)
+        D = vstack((FP1,FP2))
         return  D
 
     def fprime(x):
@@ -136,16 +138,18 @@ def max_choquet(capacity,fx,dfx,Budg):
 #    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,iprint=2,full_output=1)
     while 1: 
         try:
-            sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-11,iter=300)
+            sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-13,iter=300)
             break            
         except OverflowError:                 # dirty fix for a math range bug TBC
             print "OverFlow caught"
-            Budg = Budg + 0.00000001*rnd.random()
-            def f_eqcons(x):
-                Aeq = ones(len(x)-1)
-                beq = Budg
-                return array([dot(Aeq,x[1:])-beq])
-            sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-11,iter=300)
+            # Budg = Budg + 0.00000001*rnd.random()
+            # def f_eqcons(x):
+            #     Aeq = ones(len(x)-1)
+            #     beq = Budg
+            #     return array([dot(Aeq,x[1:])-beq])
+            sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons,fprime_ieqcons = fprime_ineqcons_w, iprint=0,full_output=1,acc=1e-13,iter=300)
+    if sol[3] != 0:
+        print "CHOQUET MAXIMIZATION ERROR", sol[4]
     return sol[0][1:]
     
 def solve_mmax(Umm,Budg):
@@ -350,40 +354,45 @@ def max_dual(cap_array,Budg):
     return sol[0][1:]
 
 
-def max_choquet_glob(capacity,fx,dfx,Budg):
+def max_choquet_glob(capacity,fx,dfx,AZ,bZ,AeqZ,beqZ):
     """
     Calculates the global maximum of Choq. w.r.t any capacity by decomposing into convex parts
     """
     mcap = Mobius(capacity)
-    sols = [[max_choquet(p,fx,dfx,Budg),p] for p in cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((len(fx),len(fx)),dtype=int),result = [])]
+    sols = [[max_choquet(p,fx,dfx,AZ,bZ,AeqZ,beqZ),p] for p in cap_dnf_t(mcap,nonzero(mcap<0)[0][0],cmatr = zeros((len(fx),len(fx)),dtype=int),result = [])]
     s1 = [[Choquet(array(p[0]),p[1],fx),p[0]] for p in sols]
     return max(s1, key=operator.itemgetter(0))[1]
     
-def solve_mmax_wval(Umm,fx,dfx,Budg):
+def solve_mmax_wval(Umm,fx,dfx,AZ,bZ,AeqZ,beqZ):
     """
     In this version Umm is suppposed to hold a VALUE in [0]s, not the point
     """
-    x0 = zeros(dim+1)
+    x0 = zeros(len(fx)+1)
 #    x0 = [0,0.1,0.2,0.3,0.4]
     
     def f_eqcons(x):
-        Aeq = ones(len(x)-1)
-        beq = Budg
-        return array([dot(Aeq,x[1:])-beq])
+        # Aeq = ones(len(x)-1)
+        # beq = Budg
+        # return array([dot(Aeq,x[1:])-beq])
+        return dot(AeqZ,x[1:])-beqZ
     
     def fprime_eqcons(x):
-        return append(0,ones(len(x)-1))
+        return insert(AeqZ,0,zeros(shape(AeqZ)[0]),1)
+        # return append(0,ones(len(x)-1))
     
     def f_ineqcons(x,Umm):
-        A = [x[0] - (p - Choquet(x[1:],v,fx)) for p,v in Umm]
-        A.extend(x)
+        A = [x[0] - (gm - Choquet(x[1:],cap,fx)) for gm,cap in Umm]
+        A.extend(bZ-dot(AZ,x[1:]))
+        # A.extend(x)                       
 #        A.extend(x[1:])
         return array(A)
     
     def f_ineqcons_prime(x,Umm):
-        A = array([append(1,Ch_gradient(x[1:],v,fx,dfx)) for p,v in Umm])
-        B = diag(ones(len(x)))        
-        D = vstack((A,B))
+        FP1 = array([append(1,Ch_gradient(x[1:],v,fx,dfx)) for p,v in Umm])
+        FP2 = insert(-AZ,0,zeros(shape(AZ)[0]),1)
+        # B = diag(ones(len(x)))        
+        # D = vstack((A,B))
+        D = vstack((FP1,FP2))
         return  D
     
     def fprime(x):
@@ -395,7 +404,7 @@ def solve_mmax_wval(Umm,fx,dfx,Budg):
     f_ineqcons_w = lambda x: f_ineqcons(x,Umm)
     fprime_ineqcons_w = lambda x: f_ineqcons_prime(x,Umm)
 #    print capacity
-    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons, fprime_ieqcons = fprime_ineqcons_w, iprint=2,full_output=1,acc=1e-11,iter=900)
+    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons, fprime_ieqcons = fprime_ineqcons_w, iprint=2,full_output=1,acc=1e-13,iter=900)
 #    sol = fmin_slsqp(objfunc,x0, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons, iprint=2,full_output=1,acc=1e-11,iter=900)
     print sol
     return sol[0][1:],sol[1]
@@ -442,53 +451,90 @@ def solve_dual(cap_array,fx,dfx,gm,Budg):
     return r.ff,cap_mix                      
 
 
-def solve_dual_sip(cap_array,fx,dfx,Budg):
+def solve_dual_sip(cap_array,fx,dfx,AZ,bZ,AeqZ,beqZ):
     """
     Another approach to dual problem
-    Input:array of pairs (gm_value, capacity(e.g. vertices of U) or its nec.measure component), functions, gradients, budget
+    Input:array of pairs (gm_value, capacity(e.g. vertices of U) or its nec.measure component), functions, gradients, constraints on Z
     Finds the robust capacity, i.e. the solution of dual problem
     Capacities assumed to be 2-MONOTONE
     Output: v^r
     """
     def f_eqcons(x):
         Aeq = ones(len(x)-1)
-        beq = Budg                           # sum lambda_i = Budg
+        beq = 1                           # sum lambda_i = 1
         return array([dot(Aeq,x[1:])-beq])
 
     def fprime_eqcons(x):
         return append(0,ones(len(x)-1))
 
     def f_ineqcons(x,cap_array,zr_array,fx):
-        A = [x[0] - dot(x[1:],array([Choquet(zr,cap,fx)-gm for gm,cap in cap_array])) for zr in zr_array] # t - sum lambda_i[C(v_i,f(zr)) - max_z C(v_i,f(z))] >= 0
+        # A = [x[0] - dot(x[1:],array([Choquet(zr,cap,fx)-gm for gm,cap in cap_array])) for zr in zr_array] # t - sum lambda_i[C(v_i,f(zr)) - max_z C(v_i,f(z))] >= 0
+        A = [-x[0] + dot(x[1:],array([gm - Choquet(zr,cap,fx) for gm,cap in cap_array])) for zr in zr_array]
 #        A.extend(x)
         A.extend(x[1:])                       # lambda >= 0 
         return array(A)
 
     def f_ineqcons_prime(x,cap_array,zr_array,fx):
-        A = array([append(1,array([gm - Choquet(zr,cap,fx) for gm,cap in cap_array])) for zr in zr_array])
+        A = array([append(-1,array([Choquet(zr,cap,fx) - gm for gm,cap in cap_array])) for zr in zr_array])
         B = diag(ones(len(x[1:])),1)[:-1]        
         D = vstack((A,B))
         return  D
 
     def fprime(x):
-        return append(1,zeros(len(x)-1))
+        return append(-1,zeros(len(x)-1))
 
     def objfunc(x):
-        return x[0]
+        return -x[0]
 
     zr_array = []
     f_ineqcons_w = lambda x: f_ineqcons(x,cap_array,zr_array,fx)
     fprime_ineqcons_w = lambda x: f_ineqcons_prime(x,cap_array,zr_array,fx)
     x = array([0]+[1./len(cap_array) for i in range(len(cap_array))])
+    # x = array([0]+[rnd.random() for i in range(len(cap_array))])
+    print x
     while 1:
-        zr_array.append(array(max_choquet(dot(x[1:],array([cap for gm,cap in cap_array])),fx,dfx,Budg)))
+        zr_array.append(array(max_choquet(dot(x[1:],array([cap for gm,cap in cap_array])),fx,dfx,AZ,bZ,AeqZ,beqZ)))
         x = fmin_slsqp(objfunc,x, fprime=fprime, f_eqcons=f_eqcons, f_ieqcons=f_ineqcons_w, fprime_eqcons = fprime_eqcons, fprime_ieqcons = fprime_ineqcons_w, iprint=2,full_output=1,acc=1e-11,iter=900)[0]
         print x
         vr = dot(x[1:],array([cap for gm,cap in cap_array]))
-        cons_val = dot(x[1:],array([gm for gm,cap in cap_array])) - Choquet(array(max_choquet(vr,fx,dfx,Budg)),vr,fx)
-        print "Constraints",min(cons_val,round(cons_val,9))
-        print "Objective", max(-x[0],round(-x[0],9))
-        if min(cons_val,round(cons_val,9)) <= max(-x[0],round(-x[0],9)):
+        print vr
+        cons_val = dot(x[1:],array([gm for gm,cap in cap_array])) - Choquet(array(max_choquet(vr,fx,dfx,AZ,bZ,AeqZ,beqZ)),vr,fx)
+        print "Constraints",max(cons_val,round(cons_val,9))
+        print "Objective", min(x[0],round(x[0],9))
+        if max(cons_val,round(cons_val,9)) >= min(x[0],round(x[0],9)):
             break
     return vr,min(cons_val,round(cons_val,9)),x[1:]
+
+
+
+def solve_dual_sip_lp(cap_array,fx,dfx,AZ,bZ,AeqZ,beqZ):
+    """
+    Another approach to dual problem
+    Input:array of pairs (gm_value, capacity(e.g. vertices of U) or its nec.measure component), functions, gradients, constraints on Z
+    Finds the robust capacity, i.e. the solution of dual problem
+    Capacities assumed to be 2-MONOTONE
+    Output: v^r
+    """
+    zr_array = []
+    x = array([0]+[1./len(cap_array) for i in range(len(cap_array))])
+    while 1:
+        zr = array(max_choquet(dot(ravel(x[1:]),array([cap for gm,cap in cap_array])),fx,dfx,AZ,bZ,AeqZ,beqZ))
+        if any([(zr == x).all() for x in zr_array]):
+            print "point already in zr_array"
+            break
+        zr_array.append(zr)
+        A = array([[Choquet(zr,cap,fx)-gm for gm,cap in cap_array] for zr in zr_array])
+        A = cvx.matrix(r_[c_[ones(len(zr_array)),A],c_[zeros(len(cap_array)),diag(-ones(len(cap_array)))]],tc='d')
+        b = cvx.matrix(zeros(len(zr_array)+len(cap_array)),tc='d')
+        Aeq = cvx.matrix(array([insert(ones(len(cap_array)),0,0)]),tc='d')
+        beq = cvx.matrix(array([1]),tc='d')
+        c = cvx.matrix(r_[1,zeros(len(cap_array))])
+        x = cvx.solvers.lp(-c,A,b,Aeq,beq,'glpk')['x']
+        vr = dot(ravel(x[1:]),array([cap for gm,cap in cap_array]))
+        cons_val = dot(ravel(x[1:]),array([gm for gm,cap in cap_array])) - Choquet(array(max_choquet(vr,fx,dfx,AZ,bZ,AeqZ,beqZ)),vr,fx)
+        print "Constraints",max(cons_val,round(cons_val,9)), cons_val
+        print "Objective", min(x[0],round(x[0],9)), x[0]  
+        if max(cons_val,round(cons_val,9)) >= min(x[0],round(x[0],9)):
+            break
+    return vr,x[0],zr
 
